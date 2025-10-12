@@ -13,6 +13,11 @@ class VideoGeneration(models.Model):
     status = models.CharField(max_length=50, default='created')
     result_url = models.URLField(blank=True, null=True)
     audio_url = models.URLField(blank=True, null=True)
+    # Store original uploaded image as base64 for UI preview
+    original_image_base64 = models.TextField(blank=True, null=True)
+    # Fields returned by D-ID image upload
+    image_id = models.CharField(max_length=255, blank=True, null=True)
+    image_s3_url = models.URLField(blank=True, null=True)
     metadata = models.JSONField(blank=True, null=True)
     config = models.JSONField(default=dict)
     created_at = models.DateTimeField(auto_now_add=True)

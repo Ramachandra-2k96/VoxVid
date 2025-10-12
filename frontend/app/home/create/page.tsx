@@ -21,19 +21,27 @@ interface Project {
   createdAt: string
 }
 
+interface CreateProjectData {
+  name: string
+  imageFile: File | null
+  imagePreviewBase64: string
+  prompt: string
+}
+
 export default function CreateProjectPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
-  const [projectData, setProjectData] = useState({
+  const [projectData, setProjectData] = useState<CreateProjectData>({
     name: '',
-    imageUrl: '',
+    imageFile: null,
+    imagePreviewBase64: '',
     prompt: ''
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!projectData.name.trim() || !projectData.imageUrl.trim() || !projectData.prompt.trim()) {
+    if (!projectData.name.trim() || (!projectData.imageFile && !projectData.imagePreviewBase64) || !projectData.prompt.trim()) {
       alert('Please fill in all fields')
       return
     }
@@ -43,17 +51,19 @@ export default function CreateProjectPage() {
     try {
       const API_URL = (process.env.NEXT_PUBLIC_API_URL as string) || 'http://127.0.0.1:8000'
       const tokens = JSON.parse(localStorage.getItem('voxvid_tokens') || '{}')
+      const form = new FormData()
+      form.append('name', projectData.name.trim())
+      form.append('script_input', projectData.prompt.trim())
+      if (projectData.imageFile) {
+        form.append('image_file', projectData.imageFile)
+      }
+
       const response = await fetch(`${API_URL}/api/videos/create/`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${tokens.access}`,
         },
-        body: JSON.stringify({
-          name: projectData.name.trim(),
-          source_url: projectData.imageUrl.trim(),
-          script_input: projectData.prompt.trim(),
-        })
+        body: form,
       })
 
       if (!response.ok) {
@@ -126,18 +136,29 @@ export default function CreateProjectPage() {
               </div>
 
               <div>
-                <Label htmlFor="imageUrl" className="text-sm font-medium">Avatar Image URL</Label>
-                <Input
-                  id="imageUrl"
-                  type="url"
-                  placeholder="https://example.com/avatar.jpg"
-                  value={projectData.imageUrl}
-                  onChange={(e) => setProjectData(prev => ({ ...prev, imageUrl: e.target.value }))}
-                  className="bg-gray-800 border-gray-600 focus:border-blue-500 mt-1"
+                <Label htmlFor="imageFile" className="text-sm font-medium">Avatar Image (upload)</Label>
+                <input
+                  id="imageFile"
+                  type="file"
+                  accept="image/*"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0] || null
+                    if (file) {
+                      // preview as base64
+                      const reader = new FileReader()
+                      reader.onload = () => {
+                        setProjectData(prev => ({ ...prev, imageFile: file, imagePreviewBase64: reader.result as string }))
+                      }
+                      reader.readAsDataURL(file)
+                    } else {
+                      setProjectData(prev => ({ ...prev, imageFile: null, imagePreviewBase64: '' }))
+                    }
+                  }}
+                  className="mt-1"
                   required
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Direct link to an image (JPG, PNG, etc.)
+                  Upload a JPG or PNG image for the avatar
                 </p>
               </div>
 
@@ -175,19 +196,19 @@ export default function CreateProjectPage() {
           </CardContent>
         </Card>
 
-        {/* Preview Section */}
-        {(projectData.imageUrl || projectData.prompt) && (
+  {/* Preview Section */}
+  {(projectData.imagePreviewBase64 || projectData.prompt) && (
           <Card className="bg-gray-900/50 border-gray-700 backdrop-blur-sm max-w-2xl mx-auto mt-8">
             <CardHeader>
               <CardTitle className="text-center">Preview</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {projectData.imageUrl && (
+                {projectData.imagePreviewBase64 && (
                   <div>
                     <h4 className="text-sm font-medium mb-2">Avatar Image</h4>
                     <img
-                      src={projectData.imageUrl}
+                      src={projectData.imagePreviewBase64}
                       alt="Avatar preview"
                       className="w-full h-48 object-cover rounded-lg border border-gray-600"
                       onError={(e) => {

@@ -13,6 +13,7 @@ interface Project {
   step: number
   prompt?: string
   imageUrl?: string
+  imageBase64?: string | null
   talkId?: string
   status?: string
   resultUrl?: string
@@ -42,7 +43,9 @@ export default function ProjectDetailPage() {
             name: data.name,
             step: data.status === 'done' ? 4 : data.status === 'created' ? 3 : 1,
             prompt: data.script_input,
-            imageUrl: data.source_url,
+            // Prefer the stored base64 preview if available, otherwise use the s3 url or source_url
+            imageBase64: data.original_image_base64 || null,
+            imageUrl: data.image_s3_url || data.source_url || null,
             talkId: data.talk_id,
             status: data.status,
             resultUrl: data.result_url,
@@ -154,7 +157,13 @@ export default function ProjectDetailPage() {
                 <ImageIcon className="h-5 w-5 text-blue-400" />
                 <h3 className="text-lg font-semibold">Source Image</h3>
               </div>
-              {project.imageUrl ? (
+              {project.imageBase64 ? (
+                <img
+                  src={project.imageBase64}
+                  alt="Source"
+                  className="w-full h-64 object-cover rounded-lg shadow-lg"
+                />
+              ) : project.imageUrl ? (
                 <img
                   src={project.imageUrl}
                   alt="Source"

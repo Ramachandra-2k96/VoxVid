@@ -13,6 +13,7 @@ interface Project {
   step: number
   prompt?: string
   imageUrl?: string
+  imageBase64?: string | null
   talkId?: string
   status?: string
   resultUrl?: string
@@ -47,12 +48,13 @@ export default function HomePage() {
       if (response.ok) {
         const data = await response.json()
         // Map to frontend format
-        const mapped = data.map((v: any) => ({
+          const mapped = data.map((v: any) => ({
           id: v.id.toString(),
           name: v.name,
           step: v.status === 'done' ? 4 : v.status === 'created' ? 3 : 1,
           prompt: v.script_input,
-          imageUrl: v.source_url,
+            imageUrl: v.source_url,
+            imageBase64: v.original_image_base64 || null,
           talkId: v.talk_id,
           status: v.status,
           resultUrl: v.result_url,
@@ -67,6 +69,41 @@ export default function HomePage() {
 
   useEffect(() => {
     loadProjects()
+  }, [])
+  useEffect(() => {
+    // If tokens might be written just before navigation (signup auto-login), wait briefly
+    const waitForTokens = async (timeout = 2000) => {
+      const start = Date.now()
+      while (Date.now() - start < timeout) {
+        const toks = localStorage.getItem('voxvid_tokens')
+        if (toks) return true
+        // small delay
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise(res => setTimeout(res, 150))
+      }
+      return false
+    }
+
+    const init = async () => {
+      const has = await waitForTokens(2500)
+      if (!has) {
+        // no tokens -> redirect to login
+        router.replace('/login')
+        return
+      }
+      loadProjects()
+    }
+
+    init()
+
+    // Listen for storage events (login/signup from another tab or earlier in same flow)
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'voxvid_tokens' && e.newValue) {
+        loadProjects()
+      }
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
   }, [])
 
   useEffect(() => {

@@ -11,6 +11,11 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+from dotenv import load_dotenv
+import os
+
+# Load environment variables from a .env file at project root (if present)
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -157,3 +162,6 @@ CORS_ALLOWED_ORIGINS = [
 
 # During development, allow credentials so browser can send cookies if needed
 CORS_ALLOW_CREDENTIALS = True
+
+# External API keys (D-ID)
+DDI_API_KEY = os.environ.get('DDI_API_KEY')
