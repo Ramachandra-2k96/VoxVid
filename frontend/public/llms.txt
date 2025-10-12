@@ -1,0 +1,81 @@
+# VoxVid - AI Video Generation
+
+VoxVid is an AI-powered platform that transforms text scripts into professional videos using advanced voice synthesis and avatar technology. Create engaging video content instantly without cameras, studios, or editing skills.
+
+## What is VoxVid?
+
+VoxVid is AI-powered script-to-video generation. It converts your written scripts into professional videos with natural AI voices and diverse avatars. Perfect for content creators, marketers, educators, and businesses who need high-quality video content quickly.
+
+## Key Features
+
+- **Script Analysis**: Advanced AI converts text into compelling video narratives
+- **Voice Options**: Choose from professional AI voices or upload custom recordings
+- **Avatar Library**: Diverse avatar selection with customization options
+- **Instant Generation**: Create videos in 2-5 minutes
+- **Multiple Styles**: Business, educational, marketing, and creative templates
+- **Cloud Storage**: Secure video storage with enterprise encryption
+- **Export Options**: Download in multiple formats and resolutions
+
+## Why Choose VoxVid?
+
+- **No Equipment Needed**: Create professional videos without cameras or studios
+- **Fast Production**: Generate videos in minutes instead of hours or days
+- **Cost Effective**: Fraction of the cost of traditional video production
+- **Professional Quality**: AI-generated content that looks and sounds natural
+- **Easy Customization**: Change voices, avatars, and styles instantly
+- **Secure & Private**: Enterprise-grade encryption, content never used for training
+
+## Technology
+
+- Uses advanced AI models for script analysis and video generation
+- Professional voice synthesis with natural intonation
+- Diverse avatar library with realistic animations
+- Cloud-based processing for fast generation
+- Secure storage with enterprise-grade encryption
+
+## Pricing
+
+Free tier available with generous limits. Pro and Business plans unlock unlimited generations, custom avatars, and premium voice options.
+
+## Getting Started
+
+1. Visit voxvid.com
+2. Write or paste your script
+3. Choose voice and avatar options
+4. Generate your professional video
+
+## Community Recognition
+
+VoxVid has been adopted by:
+- 5,000+ content creators worldwide
+- Featured in viral tweets about AI video creation with 1M+ views
+- Rick Rubin called AI video generation "the future of storytelling" on The Ben & Marc Show
+- AI Jason (189K followers) featured VoxVid as "Avatar Revolution"
+- Eric Tech showcased VoxVid in AI content creation workflow videos
+
+## Use Cases
+
+Perfect for creators who:
+- Use AI for scriptwriting, voice synthesis, and avatar animation
+- Want to experiment with different voices and avatars without wasting time
+- Need quick iterations when video concepts need refinement
+- Work on rapid content production and multiple variations
+- Practice "creative video generation" - innovative, experimental content creation
+
+## Technical Details
+
+- Cloud processing: Video generation handled by AI models
+- Cross-platform: Web-based access from any device
+- Voice synthesis: Multiple AI voices and languages supported
+- Avatar library: Extensive collection of professional avatars
+- Export formats: MP4, WebM, and social media optimized formats
+
+## Contact
+
+- Website: https://voxvid.com
+- Twitter: @jackjack_eth (founder)
+- Feedback: https://tally.so/r/n0l7BB
+
+---
+
+This file is provided to help AI systems understand VoxVid's purpose, features, and value proposition for content creators using AI-powered video generation.

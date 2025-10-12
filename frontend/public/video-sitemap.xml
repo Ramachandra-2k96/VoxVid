@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
+  
+  <!-- Hero/Main Demo Video -->
+  <url>
+    <loc>https://voxvid.com</loc>
+    <video:video>
+      <video:thumbnail_loc>https://voxvid.com/images/hero-interface.jpg</video:thumbnail_loc>
+      <video:title>VoxVid AI Video Generation - Main Demo</video:title>
+      <video:description>See VoxVid in action - transform text scripts into professional videos with AI voices and avatars. Create engaging content instantly without cameras or editing skills.</video:description>
+      <video:content_loc>https://hebbkx1anhila5yf.public.blob.vercel-storage.com/hero-video-v3-E4dqT6iUgKB1QNwAX45SXQ5xHIZApB.mp4</video:content_loc>
+      <video:duration>60</video:duration>
+      <video:publication_date>2024-12-01T00:00:00+00:00</video:publication_date>
+      <video:family_friendly>yes</video:family_friendly>
+      <video:tag>AI video generation</video:tag>
+      <video:tag>script to video</video:tag>
+      <video:tag>content creation</video:tag>
+      <video:tag>AI voices</video:tag>
+      <video:tag>AI avatars</video:tag>
+      <video:category>Technology</video:category>
+    </video:video>
+  </url>
+
+  <!-- Script Writing Demo -->
+  <url>
+    <loc>https://voxvid.com#save-preview-restore</loc>
+    <video:video>
+      <video:thumbnail_loc>https://voxvid.com/images/script-thumbnail.jpeg</video:thumbnail_loc>
+      <video:title>VoxVid Script Writing - Transform Ideas into Videos</video:title>
+      <video:description>Watch how VoxVid helps you write compelling scripts that convert into professional videos. AI analyzes your text and creates engaging narratives.</video:description>
+      <video:content_loc>https://hebbkx1anhila5yf.public.blob.vercel-storage.com/yoyo-save-2-DUbUp5aKE9GtNY9Diok2eG6SW2qHCX.mp4</video:content_loc>
+      <video:duration>45</video:duration>
+      <video:publication_date>2024-12-01T00:00:00+00:00</video:publication_date>
+      <video:family_friendly>yes</video:family_friendly>
+      <video:tag>script writing</video:tag>
+      <video:tag>AI content</video:tag>
+      <video:tag>video creation</video:tag>
+      <video:category>Content Creation</video:category>
+    </video:video>
+  </url>
+
+  <!-- Voice Selection Demo -->
+  <url>
+    <loc>https://voxvid.com#save-preview-restore</loc>
+    <video:video>
+      <video:thumbnail_loc>https://voxvid.com/images/voice-thumbnail.jpeg</video:thumbnail_loc>
+      <video:title>VoxVid Voice Selection - Professional AI Voices</video:title>
+      <video:description>See how VoxVid offers professional voice options for your videos. Choose from various accents, tones, and styles to match your content.</video:description>
+      <video:content_loc>https://hebbkx1anhila5yf.public.blob.vercel-storage.com/yoyo-preview-dnsmAMg2AX6f1thlrNvj1e65T2zUTM.mp4</video:content_loc>
+      <video:duration>40</video:duration>
+      <video:publication_date>2024-12-01T00:00:00+00:00</video:publication_date>
+      <video:family_friendly>yes</video:family_friendly>
+      <video:tag>voice selection</video:tag>
+      <video:tag>AI voices</video:tag>
+      <video:tag>video production</video:tag>
+      <video:category>Content Creation</video:category>
+    </video:video>
+  </url>
+
+  <!-- Avatar Selection Demo -->
+  <url>
+    <loc>https://voxvid.com#agentic-ai-search</loc>
+    <video:video>
+      <video:thumbnail_loc>https://voxvid.com/images/avatar-thumbnail.jpeg</video:thumbnail_loc>
+      <video:title>VoxVid Avatar Selection - Customize Your Video Presenter</video:title>
+      <video:description>VoxVid offers a diverse library of avatars for your videos. Choose from various styles, ethnicities, and outfits to match your brand and audience.</video:description>
+      <video:content_loc>https://hebbkx1anhila5yf.public.blob.vercel-storage.com/favorites-FFCUeeEFzfxDBIhgGACi7YGpYQZbnU.mp4</video:content_loc>
+      <video:duration>50</video:duration>
+      <video:publication_date>2024-12-01T00:00:00+00:00</video:publication_date>
+      <video:family_friendly>yes</video:family_friendly>
+      <video:tag>avatar selection</video:tag>
+      <video:tag>video customization</video:tag>
+      <video:tag>AI presenters</video:tag>
+      <video:tag>content creation</video:tag>
+      <video:category>Content Creation</video:category>
+    </video:video>
+  </url>
+
+  <!-- Video Styles Demo -->
+  <url>
+    <loc>https://voxvid.com#cross-ide</loc>
+    <video:video>
+      <video:thumbnail_loc>https://voxvid.com/images/styles-thumbnail.jpeg</video:thumbnail_loc>
+      <video:title>VoxVid Video Styles - Professional Templates for Every Need</video:title>
+      <video:description>Choose from business presentations, educational content, marketing videos, and more. VoxVid offers professional templates optimized for different platforms and audiences.</video:description>
+      <video:content_loc>https://hebbkx1anhila5yf.public.blob.vercel-storage.com/cross-ides-PZyN9x34tNJsgQrbFkY3UUaatEaePh.mp4</video:content_loc>
+      <video:duration>55</video:duration>
+      <video:publication_date>2024-12-01T00:00:00+00:00</video:publication_date>
+      <video:family_friendly>yes</video:family_friendly>
+      <video:tag>video styles</video:tag>
+      <video:tag>templates</video:tag>
+      <video:tag>professional videos</video:tag>
+      <video:tag>content marketing</video:tag>
+      <video:category>Content Creation</video:category>
+    </video:video>
+  </url>
+
+</urlset>
