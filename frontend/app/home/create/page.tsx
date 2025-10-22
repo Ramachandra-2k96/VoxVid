@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent } from '@/components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from '@/components/ui/badge'
 import { 
   ArrowLeft, 
@@ -57,6 +58,7 @@ interface CreateData {
   voiceProvider: string
   voiceId: string
   voiceName: string
+  voiceLanguage: string
 }
 
 export default function CreateProjectPage() {
@@ -69,6 +71,9 @@ export default function CreateProjectPage() {
   const [isLoadingVoices, setIsLoadingVoices] = useState(false)
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null)
   const [audioPlayer, setAudioPlayer] = useState<HTMLAudioElement | null>(null)
+  const [selectedLanguage, setSelectedLanguage] = useState<string>('all')
+  const [selectedGender, setSelectedGender] = useState<string>('all')
+  const [availableLanguages, setAvailableLanguages] = useState<string[]>([])
   
   const [formData, setFormData] = useState<CreateData>({
     name: '',
@@ -77,7 +82,8 @@ export default function CreateProjectPage() {
     imagePreview: '',
     voiceProvider: 'microsoft',
     voiceId: '',
-    voiceName: ''
+    voiceName: '',
+    voiceLanguage: ''
   })
 
   const providers = ['amazon', 'microsoft', 'elevenlabs', 'google', 'playHT']
@@ -106,6 +112,17 @@ export default function CreateProjectPage() {
       if (response.ok) {
         const data = await response.json()
         setVoices(prev => ({ ...prev, [provider]: data }))
+        
+        // Extract all unique languages from the voices
+        const languages = new Set<string>()
+        data.forEach((voice: VoiceOption) => {
+          voice.languages?.forEach(lang => {
+            if (lang.language) {
+              languages.add(lang.language)
+            }
+          })
+        })
+        setAvailableLanguages(Array.from(languages).sort())
       }
     } catch (error) {
       console.error('Error loading voices:', error)
@@ -203,13 +220,45 @@ export default function CreateProjectPage() {
     if (!formData.script.trim()) return
     
     setIsEnhancing(true)
-    // Simulate AI enhancement - replace with actual API call
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    setFormData(prev => ({
-      ...prev,
-      script: prev.script + '\n\n[AI Enhanced: Improved grammar and flow]'
-    }))
-    setIsEnhancing(false)
+    try {
+      const API_URL = (process.env.NEXT_PUBLIC_API_URL as string) || 'http://127.0.0.1:8000'
+      const tokens = JSON.parse(localStorage.getItem('voxvid_tokens') || '{}')
+
+      const response = await fetch(`${API_URL}/api/ai/enhance/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${tokens.access}`,
+        },
+        body: JSON.stringify({
+          script: formData.script
+        }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setFormData(prev => ({
+          ...prev,
+          script: data.enhanced_script
+        }))
+      } else {
+        console.error('Failed to enhance script')
+        // Fallback to local enhancement for demo
+        setFormData(prev => ({
+          ...prev,
+          script: prev.script + ' ai'
+        }))
+      }
+    } catch (error) {
+      console.error('Error enhancing script:', error)
+      // Fallback to local enhancement for demo
+      setFormData(prev => ({
+        ...prev,
+        script: prev.script + ' ai'
+      }))
+    } finally {
+      setIsEnhancing(false)
+    }
   }
 
   const handleSubmit = async () => {
@@ -223,6 +272,9 @@ export default function CreateProjectPage() {
       form.append('script_input', formData.script)
       form.append('voice_provider', formData.voiceProvider)
       form.append('voice_id', formData.voiceId)
+      if (formData.voiceLanguage) {
+        form.append('voice_language', formData.voiceLanguage)
+      }
       if (formData.imageFile) {
         form.append('image_file', formData.imageFile)
       }
@@ -413,6 +465,43 @@ export default function CreateProjectPage() {
               ))}
             </div>
 
+            {/* Language and Gender Filters */}
+            <Card className="bg-card border-border mb-6">
+              <CardContent className="p-6 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="language-filter">Language</Label>
+                    <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="All Languages" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Languages</SelectItem>
+                        {availableLanguages.map((language) => (
+                          <SelectItem key={language} value={language}>
+                            {language}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="gender-filter">Gender</Label>
+                    <Select value={selectedGender} onValueChange={setSelectedGender}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="All Genders" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Genders</SelectItem>
+                        <SelectItem value="male">Male</SelectItem>
+                        <SelectItem value="female">Female</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Voices Grid */}
             <div className="max-w-6xl mx-auto">
               {isLoadingVoices ? (
@@ -422,11 +511,28 @@ export default function CreateProjectPage() {
                 </div>
               ) : voices[selectedProvider] ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {voices[selectedProvider].slice(0, 12).map((voice) => {
+                  {voices[selectedProvider]
+                    .filter((voice) => {
+                      // Apply language filter
+                      if (selectedLanguage !== 'all') {
+                        const hasLanguage = voice.languages?.some(lang => lang.language === selectedLanguage)
+                        if (!hasLanguage) return false
+                      }
+                      
+                      // Apply gender filter
+                      if (selectedGender !== 'all') {
+                        if (voice.gender !== selectedGender) return false
+                      }
+                      
+                      return true
+                    })
+                    .map((voice) => {
                     const isSelected = formData.voiceId === voice.id;
-                    // Find English locale with preview URL
-                    const enLocale = voice.languages?.find(lang => lang.locale?.startsWith('en-')) || voice.languages?.[0]
-                    const previewUrl = enLocale?.previewUrl
+                    // Find the selected language or default to first available
+                    const selectedLang = voice.languages?.find(lang => lang.language === selectedLanguage) || 
+                                       voice.languages?.find(lang => lang.locale?.startsWith('en-')) || 
+                                       voice.languages?.[0]
+                    const previewUrl = selectedLang?.previewUrl
                     const isPlaying = playingVoiceId === voice.id;
                     
                     return (
@@ -437,12 +543,18 @@ export default function CreateProjectPage() {
                             ? 'ring-2 ring-primary shadow-lg border-primary bg-primary/5' 
                             : 'border-border hover:border-primary/50 hover:shadow-md'
                         }`}
-                        onClick={() => setFormData(prev => ({
-                          ...prev,
-                          voiceId: voice.id,
-                          voiceName: voice.name,
-                          voiceProvider: selectedProvider
-                        }))}
+                        onClick={() => {
+                          const selectedLangData = voice.languages?.find(lang => lang.language === selectedLanguage) || 
+                                                 voice.languages?.find(lang => lang.locale?.startsWith('en-')) || 
+                                                 voice.languages?.[0]
+                          setFormData(prev => ({
+                            ...prev,
+                            voiceId: voice.id,
+                            voiceName: voice.name,
+                            voiceProvider: selectedProvider,
+                            voiceLanguage: selectedLangData?.language || ''
+                          }))
+                        }}
                       >
                         <CardContent className="p-5">
                           <div className="flex items-start justify-between mb-3">
@@ -454,7 +566,7 @@ export default function CreateProjectPage() {
                                 )}
                               </h4>
                               <p className="text-sm text-muted-foreground capitalize mt-1">
-                                {voice.gender} • {enLocale?.language || voice.languages?.[0]?.language || 'English'}
+                                {voice.gender} • {selectedLang?.language || voice.languages?.[0]?.language || 'English'}
                               </p>
                             </div>
                             {isSelected && (
@@ -473,11 +585,11 @@ export default function CreateProjectPage() {
                                 {voice.age}
                               </Badge>
                             )}
-                            {voice.access === 'premium' && (
-                              <Badge variant="default" className="text-xs bg-gradient-to-r from-amber-500 to-orange-500">
-                                Premium
+                            {voice.styles?.map((style, index) => (
+                              <Badge key={index} variant="outline" className="text-xs">
+                                {style}
                               </Badge>
-                            )}
+                            ))}
                           </div>
                           
                           {previewUrl ? (

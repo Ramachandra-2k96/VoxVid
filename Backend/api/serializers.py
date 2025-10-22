@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
-from .models import VideoGeneration
+from .models import VideoGeneration, Profile
 
 User = get_user_model()
 
@@ -25,6 +25,28 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ("id", "username", "email", "first_name", "last_name")
+
+
+class ProfileSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    avatar_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Profile
+        fields = ('id', 'user', 'bio', 'location', 'website', 'avatar', 'avatar_url', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'created_at', 'updated_at')
+
+    def get_avatar_url(self, obj):
+        if obj.avatar:
+            return obj.avatar.url
+        return None
+
+    def update(self, instance, validated_data):
+        # Handle avatar upload
+        avatar = validated_data.get('avatar')
+        if avatar:
+            instance.avatar = avatar
+        return super().update(instance, validated_data)
 
 
 class VideoGenerationSerializer(serializers.ModelSerializer):

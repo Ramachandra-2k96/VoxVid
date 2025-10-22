@@ -9,8 +9,8 @@ import logging
 from django.conf import settings
 import base64
 from django.core.files.uploadedfile import InMemoryUploadedFile
-from .serializers import RegisterSerializer, UserSerializer, VideoGenerationSerializer
-from .models import VideoGeneration
+from .serializers import RegisterSerializer, UserSerializer, VideoGenerationSerializer, ProfileSerializer
+from .models import VideoGeneration, Profile
 
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
@@ -75,6 +75,7 @@ def create_video_generation(request):
     script_input = request.data.get('script_input')
     voice_provider = request.data.get('voice_provider')  # e.g., 'microsoft', 'elevenlabs'
     voice_id = request.data.get('voice_id')  # e.g., 'en-US-JennyNeural'
+    voice_language = request.data.get('voice_language')  # e.g., 'English (United States)'
 
     # Accept either an uploaded file (multipart/form-data) as 'image_file'
     # or a direct source_url (for backward compatibility)
@@ -147,15 +148,18 @@ def create_video_generation(request):
     # Example expected shape:
     # "script": {
     #   "type": "text",
-    #   "provider": { "type": "amazon", "voice_id": "Emma" },
+    #   "provider": { "type": "amazon", "voice_id": "Emma", "language": "English (United States)" },
     #   "input": "Making videos is easy with D-ID"
     # }
     if voice_provider and voice_id:
         # Keep backward compatibility: voice_provider might be something like 'amazon' or a dict
-        talk_payload['script']['provider'] = {
+        provider_data = {
             'type': voice_provider,
             'voice_id': voice_id
         }
+        if voice_language:
+            provider_data['language'] = voice_language
+        talk_payload['script']['provider'] = provider_data
     print(talk_payload)
     response = requests.post(
         'https://api.d-id.com/talks',
@@ -277,59 +281,31 @@ def update_video_status(request, pk):
     return Response(serializer.data)
 
 
-
-
-def get_tokens_for_user(user):
-    refresh = RefreshToken.for_user(user)
-    return {
-        'refresh': str(refresh),
-        'access': str(refresh.access_token),
-    }
-
-
-@api_view(['POST'])
-@permission_classes([AllowAny])
-def register(request):
-    serializer = RegisterSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
-    user = serializer.save()
-    tokens = get_tokens_for_user(user)
-    user_data = UserSerializer(user).data
-    return Response({"user": user_data, "tokens": tokens}, status=status.HTTP_201_CREATED)
-
-
-@api_view(['POST'])
-@permission_classes([AllowAny])
-def login_view(request):
-    # Accept either username or email
-    username = request.data.get('username') or request.data.get('email')
-    password = request.data.get('password')
-
-    if username is None or password is None:
-        return Response({"detail": "Must include username/email and password"}, status=status.HTTP_400_BAD_REQUEST)
-
-    # Try authenticate; if email provided, try to fetch username
-    user = authenticate(request, username=username, password=password)
-    if user is None:
-        # Authentication failed; try by email lookup
-        from django.contrib.auth import get_user_model
-        User = get_user_model()
-        try:
-            u = User.objects.get(email=username)
-            user = authenticate(request, username=u.username, password=password)
-        except User.DoesNotExist:
-            user = None
-
-    if user is None:
-        return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
-
-    tokens = get_tokens_for_user(user)
-    user_data = UserSerializer(user).data
-    return Response({"user": user_data, "tokens": tokens})
-
-
-@api_view(['GET'])
+@api_view(['GET', 'PUT', 'PATCH'])
 @permission_classes([IsAuthenticated])
-def me(request):
-    serializer = UserSerializer(request.user)
-    return Response(serializer.data)
+def profile_detail(request):
+    profile, created = Profile.objects.get_or_create(user=request.user)
+    
+    if request.method == 'GET':
+        serializer = ProfileSerializer(profile)
+        return Response(serializer.data)
+    
+    elif request.method in ['PUT', 'PATCH']:
+        serializer = ProfileSerializer(profile, data=request.data, partial=request.method == 'PATCH')
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def ai_enhance_script(request):
+    script = request.data.get('script', '')
+    if not script:
+        return Response({"detail": "Script is required"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # For now, just append "ai" to the script as requested
+    enhanced_script = script + " ai"
+    
+    return Response({"enhanced_script": enhanced_script})

@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-import { Camera, User, Mail, FileText, Calendar, MapPin, Link as LinkIcon } from "lucide-react"
+import { Camera, User, Mail, FileText, Calendar, MapPin, Link as LinkIcon, Loader2 } from "lucide-react"
 
 interface ProfileFormData {
   firstName: string
@@ -24,6 +24,8 @@ interface ProfileFormData {
 
 export default function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
   const [avatarPreview, setAvatarPreview] = useState<string>("")
   const [userStats, setUserStats] = useState({
     videosCreated: 0,
@@ -44,33 +46,64 @@ export default function ProfilePage() {
   })
 
   useEffect(() => {
-    // Load profile data from localStorage or API
-    const savedProfile = localStorage.getItem('userProfile')
-    if (savedProfile) {
-      const profile = JSON.parse(savedProfile)
-      form.reset(profile)
-      setAvatarPreview(profile.avatar || "")
-    } else {
-      // Mock data
-      const mockProfile = {
-        firstName: "John",
-        lastName: "Doe",
-        email: "john.doe@example.com",
-        bio: "AI video creator passionate about storytelling through technology.",
-        location: "San Francisco, CA",
-        website: "https://johndoe.com",
-        avatar: ""
-      }
-      form.reset(mockProfile)
-    }
+    fetchProfile()
+  }, [])
 
-    // Mock stats
-    setUserStats({
-      videosCreated: 12,
-      totalViews: 15420,
-      joinDate: "January 2024"
-    })
-  }, [form])
+  const fetchProfile = async () => {
+    try {
+      const API_URL = (process.env.NEXT_PUBLIC_API_URL as string) || 'http://127.0.0.1:8000'
+      const tokens = JSON.parse(localStorage.getItem('voxvid_tokens') || '{}')
+
+      // Fetch profile data
+      const profileResponse = await fetch(`${API_URL}/api/profile/`, {
+        headers: {
+          'Authorization': `Bearer ${tokens.access}`,
+        },
+      })
+
+      if (profileResponse.ok) {
+        const profileData = await profileResponse.json()
+        form.reset({
+          firstName: profileData.user.first_name,
+          lastName: profileData.user.last_name,
+          email: profileData.user.email,
+          bio: profileData.bio || "",
+          location: profileData.location || "",
+          website: profileData.website || "",
+        })
+        setAvatarPreview(profileData.avatar_url || "")
+        setUserStats(prev => ({
+          ...prev,
+          joinDate: new Date(profileData.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+        }))
+      }
+
+      // Fetch video count
+      const videosResponse = await fetch(`${API_URL}/api/videos/`, {
+        headers: {
+          'Authorization': `Bearer ${tokens.access}`,
+        },
+      })
+
+      if (videosResponse.ok) {
+        const videosData = await videosResponse.json()
+        const videoCount = Array.isArray(videosData) ? videosData.length : videosData.count || 0
+        const totalViews = Array.isArray(videosData) 
+          ? videosData.reduce((sum: number, video: any) => sum + (video.view_count || 0), 0)
+          : 0
+
+        setUserStats(prev => ({
+          ...prev,
+          videosCreated: videoCount,
+          totalViews: totalViews
+        }))
+      }
+    } catch (error) {
+      console.error('Error fetching profile data:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -83,18 +116,54 @@ export default function ProfilePage() {
     }
   }
 
-  const onSubmit = (data: ProfileFormData) => {
-    const profileData = {
-      ...data,
-      avatar: avatarPreview
+  const onSubmit = async (data: ProfileFormData) => {
+    setIsSaving(true)
+    try {
+      const API_URL = (process.env.NEXT_PUBLIC_API_URL as string) || 'http://127.0.0.1:8000'
+      const tokens = JSON.parse(localStorage.getItem('voxvid_tokens') || '{}')
+
+      const formData = new FormData()
+      formData.append('bio', data.bio)
+      formData.append('location', data.location)
+      formData.append('website', data.website)
+
+      // Handle avatar upload if changed
+      if (fileInputRef.current?.files?.[0]) {
+        formData.append('avatar', fileInputRef.current.files[0])
+      }
+
+      const response = await fetch(`${API_URL}/api/profile/`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${tokens.access}`,
+        },
+        body: formData,
+      })
+
+      if (response.ok) {
+        const updatedProfile = await response.json()
+        setAvatarPreview(updatedProfile.avatar_url || "")
+        setIsEditing(false)
+      } else {
+        console.error('Failed to update profile')
+      }
+    } catch (error) {
+      console.error('Error updating profile:', error)
+    } finally {
+      setIsSaving(false)
     }
-    localStorage.setItem('userProfile', JSON.stringify(profileData))
-    setIsEditing(false)
-    // Here you could also send to backend API
   }
 
   const getInitials = (firstName: string, lastName: string) => {
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background text-foreground p-6 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin" />
+      </div>
+    )
   }
 
   return (
@@ -299,8 +368,15 @@ export default function ProfilePage() {
                       <Button type="button" variant="outline" onClick={() => setIsEditing(false)}>
                         Cancel
                       </Button>
-                      <Button type="submit">
-                        Save Changes
+                      <Button type="submit" disabled={isSaving}>
+                        {isSaving ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          "Save Changes"
+                        )}
                       </Button>
                     </div>
                   )}
