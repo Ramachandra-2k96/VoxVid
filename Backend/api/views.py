@@ -73,6 +73,8 @@ def me(request):
 def create_video_generation(request):
     name = request.data.get('name')
     script_input = request.data.get('script_input')
+    voice_provider = request.data.get('voice_provider')  # e.g., 'microsoft', 'elevenlabs'
+    voice_id = request.data.get('voice_id')  # e.g., 'en-US-JennyNeural'
 
     # Accept either an uploaded file (multipart/form-data) as 'image_file'
     # or a direct source_url (for backward compatibility)
@@ -128,6 +130,33 @@ def create_video_generation(request):
             return Response({"detail": "Failed to process uploaded image"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     # Call D-ID talks API
+    # Build the request payload
+    talk_payload = {
+        'source_url': source_url,
+        'script': {
+            'type': 'text',
+            'input': script_input,
+        },
+        "config": {
+            "driver_url": "bank://lively/",
+            "motion_factor": 1.0,
+        }
+    }
+
+    # Attach voice/provider inside script to match D-ID talks API expected shape
+    # Example expected shape:
+    # "script": {
+    #   "type": "text",
+    #   "provider": { "type": "amazon", "voice_id": "Emma" },
+    #   "input": "Making videos is easy with D-ID"
+    # }
+    if voice_provider and voice_id:
+        # Keep backward compatibility: voice_provider might be something like 'amazon' or a dict
+        talk_payload['script']['provider'] = {
+            'type': voice_provider,
+            'voice_id': voice_id
+        }
+    print(talk_payload)
     response = requests.post(
         'https://api.d-id.com/talks',
         headers={
@@ -135,17 +164,7 @@ def create_video_generation(request):
             'Content-Type': 'application/json',
             'Authorization': f'Basic {did_api_key}',
         },
-        json={
-            'source_url': source_url,
-            'script': {
-                'type': 'text',
-                'input': script_input,
-            },
-            'config': {
-                'fluent': 'false',
-                'pad_audio': '0.0',
-            },
-        }
+        json=talk_payload
     )
 
     if not response.ok:
@@ -164,6 +183,8 @@ def create_video_generation(request):
         script_input=script_input,
         talk_id=talk_id,
         status='created',
+        voice_provider=voice_provider,
+        voice_id=voice_id,
         config={'fluent': False, 'pad_audio': 0.0},
         original_image_base64=(data_uri if 'data_uri' in locals() else None),
         image_id=(image_id if 'image_id' in locals() else None),

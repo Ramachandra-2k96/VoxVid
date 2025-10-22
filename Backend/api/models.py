@@ -18,6 +18,9 @@ class VideoGeneration(models.Model):
     # Fields returned by D-ID image upload
     image_id = models.CharField(max_length=255, blank=True, null=True)
     image_s3_url = models.URLField(blank=True, null=True)
+    # Voice configuration fields
+    voice_provider = models.CharField(max_length=50, blank=True, null=True)
+    voice_id = models.CharField(max_length=255, blank=True, null=True)
     metadata = models.JSONField(blank=True, null=True)
     config = models.JSONField(default=dict)
     created_at = models.DateTimeField(auto_now_add=True)

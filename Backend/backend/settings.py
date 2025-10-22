@@ -165,3 +165,4 @@ CORS_ALLOW_CREDENTIALS = True
 
 # External API keys (D-ID)
 DDI_API_KEY = os.environ.get('DDI_API_KEY')
+print("DDI_API_KEY:", DDI_API_KEY)

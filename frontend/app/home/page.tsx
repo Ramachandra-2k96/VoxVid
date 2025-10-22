@@ -3,9 +3,9 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Sparkles, Video } from 'lucide-react'
+import { Plus, Sparkles, Video, Clock, CheckCircle2, Loader2, PlayCircle, Zap } from 'lucide-react'
 
 interface Project {
   id: string
@@ -23,6 +23,7 @@ interface Project {
 export default function HomePage() {
   const router = useRouter()
   const [projects, setProjects] = useState<Project[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     // Protect page client-side: if no access token, redirect to login
@@ -64,12 +65,11 @@ export default function HomePage() {
       }
     } catch (error) {
       console.error('Error loading projects:', error)
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  useEffect(() => {
-    loadProjects()
-  }, [])
   useEffect(() => {
     // If tokens might be written just before navigation (signup auto-login), wait briefly
     const waitForTokens = async (timeout = 2000) => {
@@ -147,104 +147,203 @@ export default function HomePage() {
 
   const getStatusBadge = (project: Project) => {
     switch (project.step) {
-      case 0: return <Badge variant="secondary" className="bg-gray-700">Draft</Badge>
-      case 1: return <Badge variant="secondary" className="bg-blue-900">In Progress</Badge>
-      case 2: return <Badge variant="secondary" className="bg-blue-900">Ready</Badge>
-      case 3: return <Badge variant="outline" className="border-yellow-500 text-yellow-500">Generating</Badge>
-      case 4: return <Badge variant="default" className="bg-green-600">Completed</Badge>
-      default: return null
+      case 0: return <Badge variant="secondary" className="bg-muted/50 hover:bg-muted/70 border-border">Draft</Badge>
+      case 1: return <Badge variant="secondary" className="bg-blue-500/10 text-blue-400 border-blue-500/20">Pending</Badge>
+      case 3: return (
+        <Badge variant="secondary" className="bg-amber-500/10 text-amber-400 border-amber-500/20">
+          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+          Processing
+        </Badge>
+      )
+      case 4: return (
+        <Badge variant="secondary" className="bg-green-500/10 text-green-400 border-green-500/20">
+          <CheckCircle2 className="mr-1 h-3 w-3" />
+          Complete
+        </Badge>
+      )
+      default: return <Badge variant="secondary">Unknown</Badge>
+    }
+  }
+
+  const formatDate = (dateStr: string) => {
+    try {
+      return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    } catch {
+      return dateStr
     }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black text-white">
-      <div className="max-w-7xl mx-auto p-8">
-        {/* Hero Section */}
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 rounded-full px-4 py-2 mb-6">
-            <Sparkles className="h-4 w-4 text-blue-400" />
-            <span className="text-sm text-blue-400 font-medium">AI-Powered Video Generation</span>
+    <div className="min-h-screen bg-background pb-24 theme-transition">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header Section */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <h1 className="text-3xl md:text-4xl font-bold text-foreground font-geist">
+                Your Projects
+              </h1>
+              <p className="text-muted-foreground mt-1">
+                Create and manage your AI-generated videos
+              </p>
+            </div>
+            <Button 
+              onClick={() => router.push('/home/create')}
+              size="lg"
+              className="bg-gradient-to-r from-cyan-500 via-orange-500 to-pink-500 hover:opacity-90 text-white border-0 shadow-lg hover:shadow-xl transition-all"
+            >
+              <Plus className="mr-2 h-5 w-5" />
+              <span className="hidden sm:inline">New Project</span>
+              <span className="sm:hidden">New</span>
+            </Button>
           </div>
-          <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 bg-clip-text text-transparent">
-            Personalized Voice-to-Video Narrator
-          </h1>
-          <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-            Transform text scripts into professional videos with AI voices and avatars.
-            Create engaging video content instantly.
-          </p>
-          <Button
-            onClick={() => router.push('/home/create')}
-            size="lg"
-            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
-          >
-            <Plus className="mr-2 h-5 w-5" />
-            Create New Video
-          </Button>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <Card className="bg-card border-border hover:border-primary/50 transition-all theme-transition">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Projects</p>
+                  <p className="text-2xl font-bold text-foreground mt-1">{projects.length}</p>
+                </div>
+                <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center">
+                  <Video className="h-6 w-6 text-blue-500" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card border-border hover:border-primary/50 transition-all theme-transition">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Completed</p>
+                  <p className="text-2xl font-bold text-foreground mt-1">
+                    {projects.filter(p => p.step === 4).length}
+                  </p>
+                </div>
+                <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center">
+                  <CheckCircle2 className="h-6 w-6 text-green-500" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card border-border hover:border-primary/50 transition-all theme-transition">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Processing</p>
+                  <p className="text-2xl font-bold text-foreground mt-1">
+                    {projects.filter(p => p.step === 3).length}
+                  </p>
+                </div>
+                <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center">
+                  <Loader2 className="h-6 w-6 text-amber-500 animate-spin" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Projects Grid */}
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold mb-6">Your Projects</h2>
-          {projects.length === 0 ? (
-            <div className="text-center py-16">
-              <Video className="h-16 w-16 text-gray-600 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold mb-2">No projects yet</h3>
-              <p className="text-gray-400 mb-6">Create your first AI-generated video to get started</p>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center">
+              <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
+              <p className="text-muted-foreground">Loading your projects...</p>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {projects.map(project => (
-                <Card
-                  key={project.id}
-                  className={`bg-gray-900/50 border-gray-700 backdrop-blur-sm hover:bg-gray-800/50 transition-all duration-300 cursor-pointer ${
-                    project.step === 4 ? 'hover:border-blue-500/50 hover:shadow-lg hover:shadow-blue-500/10' : ''
-                  }`}
-                  onClick={() => handleProjectClick(project)}
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex justify-between items-start">
-                      <CardTitle className="text-white text-lg truncate">
-                        {project.name || 'Untitled Project'}
-                      </CardTitle>
-                      {getStatusBadge(project)}
+          </div>
+        ) : projects.length === 0 ? (
+          <Card className="bg-card border-border border-dashed theme-transition">
+            <CardContent className="p-12 text-center">
+              <div className="w-20 h-20 rounded-full bg-gradient-to-r from-cyan-500/10 via-orange-500/10 to-pink-500/10 flex items-center justify-center mx-auto mb-6">
+                <Sparkles className="h-10 w-10 text-primary" />
+              </div>
+              <h3 className="text-xl font-semibold text-foreground mb-2">No projects yet</h3>
+              <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                Get started by creating your first AI-powered video project. It only takes a few clicks!
+              </p>
+              <Button 
+                onClick={() => router.push('/home/create')}
+                size="lg"
+                className="bg-gradient-to-r from-cyan-500 via-orange-500 to-pink-500 hover:opacity-90 text-white"
+              >
+                <Zap className="mr-2 h-5 w-5" />
+                Create Your First Project
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {projects.map(project => (
+              <Card 
+                key={project.id}
+                className={`bg-card border-border overflow-hidden group hover:border-primary/50 transition-all theme-transition ${
+                  project.step === 4 ? 'cursor-pointer hover:shadow-lg' : 'cursor-default'
+                }`}
+                onClick={() => handleProjectClick(project)}
+              >
+                <div className="relative aspect-video bg-muted overflow-hidden">
+                  {project.imageBase64 ? (
+                    <img
+                      src={project.imageBase64}
+                      alt={project.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : project.imageUrl ? (
+                    <img
+                      src={project.imageUrl}
+                      alt={project.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted/50">
+                      <Video className="h-12 w-12 text-muted-foreground" />
                     </div>
-                  </CardHeader>
-                  <CardContent>
-                    {project.step === 4 && project.resultUrl ? (
-                      <div className="space-y-3">
-                        <div className="aspect-video bg-gray-800 rounded-lg overflow-hidden">
-                          <video
-                            src={project.resultUrl}
-                            className="w-full h-full object-cover"
-                            muted
-                            onMouseEnter={(e) => e.currentTarget.play()}
-                            onMouseLeave={(e) => e.currentTarget.pause()}
-                          />
-                        </div>
-                        <p className="text-xs text-gray-400">
-                          Click to view full details
-                        </p>
-                      </div>
-                    ) : project.step === 3 ? (
-                      <div className="aspect-video bg-gray-800 rounded-lg flex flex-col items-center justify-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-                        <span className="text-sm text-gray-300 mt-2">Generating...</span>
-                      </div>
-                    ) : (
-                      <div className="aspect-video bg-gray-800 rounded-lg flex items-center justify-center">
-                        <Video className="h-12 w-12 text-gray-600" />
-                      </div>
-                    )}
-                    <div className="mt-3 text-xs text-gray-500">
-                      {new Date(project.createdAt).toLocaleDateString()}
+                  )}
+                  
+                  {project.step === 4 && (
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <PlayCircle className="h-16 w-16 text-white" />
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
+                  )}
+                  
+                  {project.step === 3 && (
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                      <Loader2 className="h-12 w-12 text-white animate-spin" />
+                    </div>
+                  )}
+                </div>
+
+                <CardHeader className="p-4">
+                  <div className="flex items-start justify-between mb-2">
+                    <CardTitle className="text-lg font-semibold text-foreground line-clamp-1">
+                      {project.name}
+                    </CardTitle>
+                    {getStatusBadge(project)}
+                  </div>
+                  {project.prompt && (
+                    <CardDescription className="text-sm text-muted-foreground line-clamp-2">
+                      {project.prompt}
+                    </CardDescription>
+                  )}
+                </CardHeader>
+
+                <CardContent className="p-4 pt-0">
+                  <div className="flex items-center text-xs text-muted-foreground">
+                    <Clock className="h-3 w-3 mr-1" />
+                    {formatDate(project.createdAt)}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
 }
+    

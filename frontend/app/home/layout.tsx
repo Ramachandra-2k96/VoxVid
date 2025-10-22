@@ -14,7 +14,6 @@ export default function HomeLayout({
 
   const items = [
     { icon: <VscHome size={18} />, label: 'Home', onClick: () => router.push('/home') },
-    { icon: <VscArchive size={18} />, label: 'Archive', onClick: () => router.push('/home/archive') },
     { icon: <VscAccount size={18} />, label: 'Profile', onClick: () => router.push('/home/profile') },
     { icon: <VscSettingsGear size={18} />, label: 'Settings', onClick: () => router.push('/home/settings') },
   ];
