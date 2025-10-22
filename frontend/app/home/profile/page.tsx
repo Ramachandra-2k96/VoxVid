@@ -1,11 +1,315 @@
 "use client"
 
+import { useState, useEffect, useRef } from "react"
+import { useForm } from "react-hook-form"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { Camera, User, Mail, FileText, Calendar, MapPin, Link as LinkIcon } from "lucide-react"
+
+interface ProfileFormData {
+  firstName: string
+  lastName: string
+  email: string
+  bio: string
+  location: string
+  website: string
+}
+
 export default function ProfilePage() {
+  const [isEditing, setIsEditing] = useState(false)
+  const [avatarPreview, setAvatarPreview] = useState<string>("")
+  const [userStats, setUserStats] = useState({
+    videosCreated: 0,
+    totalViews: 0,
+    joinDate: "January 2024"
+  })
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const form = useForm<ProfileFormData>({
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      email: "",
+      bio: "",
+      location: "",
+      website: "",
+    }
+  })
+
+  useEffect(() => {
+    // Load profile data from localStorage or API
+    const savedProfile = localStorage.getItem('userProfile')
+    if (savedProfile) {
+      const profile = JSON.parse(savedProfile)
+      form.reset(profile)
+      setAvatarPreview(profile.avatar || "")
+    } else {
+      // Mock data
+      const mockProfile = {
+        firstName: "John",
+        lastName: "Doe",
+        email: "john.doe@example.com",
+        bio: "AI video creator passionate about storytelling through technology.",
+        location: "San Francisco, CA",
+        website: "https://johndoe.com",
+        avatar: ""
+      }
+      form.reset(mockProfile)
+    }
+
+    // Mock stats
+    setUserStats({
+      videosCreated: 12,
+      totalViews: 15420,
+      joinDate: "January 2024"
+    })
+  }, [form])
+
+  const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        setAvatarPreview(e.target?.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const onSubmit = (data: ProfileFormData) => {
+    const profileData = {
+      ...data,
+      avatar: avatarPreview
+    }
+    localStorage.setItem('userProfile', JSON.stringify(profileData))
+    setIsEditing(false)
+    // Here you could also send to backend API
+  }
+
+  const getInitials = (firstName: string, lastName: string) => {
+    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
+  }
+
   return (
-    <div className="min-h-screen bg-black text-white p-8">
-      <h1 className="text-4xl font-bold mb-4">Profile</h1>
-      <p className="text-lg">This is the profile page. Manage your account settings and preferences here.</p>
-      {/* Add profile content here */}
+    <div className="min-h-screen bg-background text-foreground p-6">
+      <div className="max-w-4xl mx-auto space-y-6">
+        <div className="space-y-2">
+          <h1 className="text-3xl font-bold tracking-tight">Profile</h1>
+          <p className="text-muted-foreground">
+            Manage your account information and public profile.
+          </p>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-3">
+          {/* Profile Overview */}
+          <Card className="md:col-span-1">
+            <CardHeader className="text-center">
+              <div className="relative mx-auto">
+                <Avatar className="w-24 h-24 mx-auto">
+                  <AvatarImage src={avatarPreview} alt="Profile picture" />
+                  <AvatarFallback className="text-lg">
+                    {getInitials(form.watch("firstName"), form.watch("lastName"))}
+                  </AvatarFallback>
+                </Avatar>
+                {isEditing && (
+                  <Button
+                    size="icon"
+                    variant="secondary"
+                    className="absolute -bottom-2 -right-2 rounded-full w-8 h-8"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Camera className="w-4 h-4" />
+                  </Button>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarChange}
+                  className="hidden"
+                />
+              </div>
+              <CardTitle className="mt-4">
+                {form.watch("firstName")} {form.watch("lastName")}
+              </CardTitle>
+              <CardDescription>{form.watch("email")}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 text-center">
+                <div>
+                  <div className="text-2xl font-bold">{userStats.videosCreated}</div>
+                  <div className="text-sm text-muted-foreground">Videos</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">{userStats.totalViews.toLocaleString()}</div>
+                  <div className="text-sm text-muted-foreground">Views</div>
+                </div>
+              </div>
+              <Separator />
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <Calendar className="w-4 h-4" />
+                  Joined {userStats.joinDate}
+                </div>
+                {form.watch("location") && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <MapPin className="w-4 h-4" />
+                    {form.watch("location")}
+                  </div>
+                )}
+                {form.watch("website") && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <LinkIcon className="w-4 h-4" />
+                    <a href={form.watch("website")} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                      {form.watch("website")}
+                    </a>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Profile Form */}
+          <Card className="md:col-span-2">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Personal Information</CardTitle>
+                  <CardDescription>
+                    Update your personal details and bio.
+                  </CardDescription>
+                </div>
+                <Button
+                  variant={isEditing ? "outline" : "default"}
+                  onClick={() => setIsEditing(!isEditing)}
+                >
+                  {isEditing ? "Cancel" : "Edit Profile"}
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="firstName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>First Name</FormLabel>
+                          <FormControl>
+                            <Input {...field} disabled={!isEditing} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="lastName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Last Name</FormLabel>
+                          <FormControl>
+                            <Input {...field} disabled={!isEditing} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input {...field} type="email" disabled={!isEditing} />
+                        </FormControl>
+                        <FormDescription>
+                          This email will be used for account notifications.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="bio"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Bio</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            {...field}
+                            disabled={!isEditing}
+                            placeholder="Tell us about yourself..."
+                            className="min-h-[100px]"
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Brief description for your profile. Max 500 characters.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="location"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Location</FormLabel>
+                          <FormControl>
+                            <Input {...field} disabled={!isEditing} placeholder="City, Country" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="website"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Website</FormLabel>
+                          <FormControl>
+                            <Input {...field} disabled={!isEditing} placeholder="https://..." />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {isEditing && (
+                    <div className="flex justify-end gap-2">
+                      <Button type="button" variant="outline" onClick={() => setIsEditing(false)}>
+                        Cancel
+                      </Button>
+                      <Button type="submit">
+                        Save Changes
+                      </Button>
+                    </div>
+                  )}
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   )
 }
