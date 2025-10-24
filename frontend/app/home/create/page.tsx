@@ -90,6 +90,46 @@ export default function CreateProjectPage() {
 
   const totalSteps = 5
 
+  // Check authentication
+  useEffect(() => {
+    const checkAuth = () => {
+      try {
+        const tokens = localStorage.getItem('voxvid_tokens')
+        if (!tokens) {
+          router.replace('/login')
+          return
+        }
+        
+        const parsedTokens = JSON.parse(tokens)
+        if (!parsedTokens.access) {
+          router.replace('/login')
+          return
+        }
+        
+        // Optional: Check if token is expired
+        try {
+          const payload = JSON.parse(atob(parsedTokens.access.split('.')[1]))
+          const currentTime = Date.now() / 1000
+          if (payload.exp < currentTime) {
+            localStorage.removeItem('voxvid_tokens')
+            router.replace('/login')
+            return
+          }
+        } catch (e) {
+          // If token parsing fails, redirect to login
+          localStorage.removeItem('voxvid_tokens')
+          router.replace('/login')
+          return
+        }
+      } catch (e) {
+        localStorage.removeItem('voxvid_tokens')
+        router.replace('/login')
+      }
+    }
+    
+    checkAuth()
+  }, [router])
+
   // Load voices when provider changes
   useEffect(() => {
     if (currentStep === 4 && selectedProvider && !voices[selectedProvider]) {

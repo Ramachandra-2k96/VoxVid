@@ -25,17 +25,45 @@ export default function HomePage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
+  // Check authentication
   useEffect(() => {
-    // Protect page client-side: if no access token, redirect to login
-    try {
-      const tokens = localStorage.getItem('voxvid_tokens')
-      if (!tokens) {
+    const checkAuth = () => {
+      try {
+        const tokens = localStorage.getItem('voxvid_tokens')
+        if (!tokens) {
+          router.replace('/login')
+          return
+        }
+        
+        const parsedTokens = JSON.parse(tokens)
+        if (!parsedTokens.access) {
+          router.replace('/login')
+          return
+        }
+        
+        // Optional: Check if token is expired
+        try {
+          const payload = JSON.parse(atob(parsedTokens.access.split('.')[1]))
+          const currentTime = Date.now() / 1000
+          if (payload.exp < currentTime) {
+            localStorage.removeItem('voxvid_tokens')
+            router.replace('/login')
+            return
+          }
+        } catch (e) {
+          // If token parsing fails, redirect to login
+          localStorage.removeItem('voxvid_tokens')
+          router.replace('/login')
+          return
+        }
+      } catch (e) {
+        localStorage.removeItem('voxvid_tokens')
         router.replace('/login')
       }
-    } catch (e) {
-      router.replace('/login')
     }
-  }, [])
+    
+    checkAuth()
+  }, [router])
 
   const loadProjects = async () => {
     try {

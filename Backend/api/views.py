@@ -11,6 +11,17 @@ import base64
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from .serializers import RegisterSerializer, UserSerializer, VideoGenerationSerializer, ProfileSerializer
 from .models import VideoGeneration, Profile
+from agno.agent import Agent
+from agno.models.cerebras import CerebrasOpenAI
+from backend.settings import CEREBRUS_API_KEY
+import os
+import tempfile
+from api.gcp_storage import (
+    ensure_bucket_exists,
+    upload_file_object_to_gcp,
+    download_and_upload_to_gcp,
+    generate_unique_blob_name
+)
 
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
@@ -18,7 +29,7 @@ def get_tokens_for_user(user):
         'refresh': str(refresh),
         'access': str(refresh.access_token),
     }
-
+    
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -70,6 +81,20 @@ def me(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+def logout_view(request):
+    try:
+        refresh_token = request.data.get('refresh_token')
+        if refresh_token:
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+        return Response({"detail": "Successfully logged out."}, status=status.HTTP_200_OK)
+    except Exception as e:
+        # Even if token blacklisting fails, return success for client-side logout
+        return Response({"detail": "Logged out."}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def create_video_generation(request):
     name = request.data.get('name')
     script_input = request.data.get('script_input')
@@ -90,45 +115,29 @@ def create_video_generation(request):
         logging.error('DDI_API_KEY not set in settings')
         return Response({"detail": "D-ID API key not configured on server"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    # If an image file was uploaded, upload it to D-ID images endpoint first
+    # Ensure GCP bucket exists
+    try:
+        ensure_bucket_exists()
+    except Exception as e:
+        logging.error(f'Failed to ensure GCP bucket exists: {e}')
+        return Response({"detail": "Failed to initialize GCP storage"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    # If an image file was uploaded, upload it to GCP first
+    gcp_image_url = None
     if uploaded_file and isinstance(uploaded_file, InMemoryUploadedFile):
         try:
-            # read bytes and create base64 for storage
-            uploaded_file.seek(0)
-            file_bytes = uploaded_file.read()
-            b64 = base64.b64encode(file_bytes).decode('utf-8')
-            # store as data URI using content_type
-            data_uri = f"data:{uploaded_file.content_type};base64,{b64}"
-
-            # Upload to D-ID images endpoint
-            files = {
-                'image': (uploaded_file.name, file_bytes, uploaded_file.content_type)
-            }
-            img_resp = requests.post(
-                'https://api.d-id.com/images',
-                headers={
-                    'Authorization': f'Basic {did_api_key}',
-                },
-                files=files,
-            )
-            if not img_resp.ok:
-                logging.error('D-ID image upload failed: %s', img_resp.text)
-                return Response({"detail": "Failed to upload image to D-ID"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-            img_data = img_resp.json()
-            # D-ID may return keys like 'url' and 'id'
-            image_s3_url = img_data.get('url') or img_data.get('image_url') or img_data.get('s3_url')
-            image_id = img_data.get('id') or img_data.get('image_id')
-
-            # Use the returned s3 url as source_url for talks API
-            if not image_s3_url:
-                logging.error('D-ID image upload did not return a URL: %s', img_data)
-                return Response({"detail": "D-ID image upload returned no URL"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-            source_url = image_s3_url
+            # Generate unique blob name for the image
+            blob_name = generate_unique_blob_name('images', uploaded_file.name)
+            
+            # Upload to GCP and get public URL
+            gcp_image_url = upload_file_object_to_gcp(uploaded_file, blob_name)
+            
+            # Use GCP URL as source_url for D-ID
+            source_url = gcp_image_url
+            
         except Exception as e:
-            logging.exception('Error handling uploaded image: %s', e)
-            return Response({"detail": "Failed to process uploaded image"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            logging.exception('Error uploading image to GCP: %s', e)
+            return Response({"detail": "Failed to upload image to GCP"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     # Call D-ID talks API
     # Build the request payload
@@ -144,13 +153,6 @@ def create_video_generation(request):
         }
     }
 
-    # Attach voice/provider inside script to match D-ID talks API expected shape
-    # Example expected shape:
-    # "script": {
-    #   "type": "text",
-    #   "provider": { "type": "amazon", "voice_id": "Emma", "language": "English (United States)" },
-    #   "input": "Making videos is easy with D-ID"
-    # }
     if voice_provider and voice_id:
         # Keep backward compatibility: voice_provider might be something like 'amazon' or a dict
         provider_data = {
@@ -179,20 +181,17 @@ def create_video_generation(request):
     if not talk_id:
         return Response({"detail": "No talk ID from D-ID"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    # Save to DB
+    # Save to DB with GCP image URL
     video_gen = VideoGeneration.objects.create(
         user=request.user,
         name=name,
-        source_url=source_url,
+        source_url=gcp_image_url or source_url,  # Store GCP URL
         script_input=script_input,
         talk_id=talk_id,
         status='created',
         voice_provider=voice_provider,
         voice_id=voice_id,
         config={'fluent': False, 'pad_audio': 0.0},
-        original_image_base64=(data_uri if 'data_uri' in locals() else None),
-        image_id=(image_id if 'image_id' in locals() else None),
-        image_s3_url=(image_s3_url if 'image_s3_url' in locals() else None),
     )
 
     serializer = VideoGenerationSerializer(video_gen)
@@ -216,32 +215,7 @@ def get_video_generation(request, pk):
         return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
 
     serializer = VideoGenerationSerializer(video)
-    data = serializer.data
-
-    # If the original base64 preview is missing, attempt to fetch the image from
-    # the stored image_s3_url or source_url and attach a data URI so the frontend
-    # can display a preview. This is a best-effort fallback for legacy records.
-    try:
-        if not data.get('original_image_base64'):
-            candidate_url = video.image_s3_url or video.source_url
-            if candidate_url:
-                # If candidate_url is an s3:// URL, try to convert to a public https URL
-                if candidate_url.startswith('s3://'):
-                    rest = candidate_url[len('s3://'):]
-                    # Map to the common S3 public URL pattern as a best-effort
-                    candidate_url = f'https://s3.amazonaws.com/{rest}'
-
-                if candidate_url.startswith('http'):
-                    resp = requests.get(candidate_url, timeout=6)
-                    if resp.ok and resp.content:
-                        content_type = resp.headers.get('Content-Type', 'image/jpeg')
-                        b64 = base64.b64encode(resp.content).decode('utf-8')
-                        data_uri = f'data:{content_type};base64,{b64}'
-                        data['original_image_base64'] = data_uri
-    except Exception as e:
-        logging.exception('Failed to fetch remote image for preview: %s', e)
-
-    return Response(data)
+    return Response(serializer.data)
 
 
 @api_view(['POST'])
@@ -269,8 +243,27 @@ def update_video_status(request, pk):
     if response.ok:
         data = response.json()
         video.status = data.get('status', video.status)
-        if 'result_url' in data:
-            video.result_url = data['result_url']
+        
+        # If video generation is done and result_url is available, upload to GCP
+        if 'result_url' in data and data['result_url']:
+            did_video_url = data['result_url']
+            
+            # Check if we already have a GCP URL (avoid re-uploading)
+            if not video.result_url or not video.result_url.startswith('https://storage.googleapis.com/'):
+                try:
+                    # Generate unique blob name for the video
+                    blob_name = generate_unique_blob_name('videos', f"{video.name}_{video.talk_id}.mp4")
+                    
+                    # Download from D-ID and upload to GCP
+                    gcp_video_url = download_and_upload_to_gcp(did_video_url, blob_name)
+                    
+                    # Store GCP URL instead of D-ID URL
+                    video.result_url = gcp_video_url
+                except Exception as e:
+                    logging.exception('Error uploading video to GCP: %s', e)
+                    # Fallback to D-ID URL if GCP upload fails
+                    video.result_url = did_video_url
+            
         if 'audio_url' in data:
             video.audio_url = data['audio_url']
         if 'metadata' in data:
@@ -304,8 +297,37 @@ def ai_enhance_script(request):
     script = request.data.get('script', '')
     if not script:
         return Response({"detail": "Script is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+    agent = Agent(
+        model=CerebrasOpenAI(id="gpt-oss-120b", api_key=CEREBRUS_API_KEY),
+        markdown=False,
+        instructions = """
+            You are a professional **Script Enhancer**.
+            Your only task is to **improve user-provided scripts** by:
+
+            * Correcting all grammar, spelling, and punctuation errors.
+            * Enhancing dialogue for clarity, tone, and natural flow.
+            * Preserving the original meaning, structure, and intent.
+            * Elevating language quality while keeping it natural and engaging.
+            * Maintaining the original format, scene order, and character names.
+
+            When responding:
+
+            * Output **only** the enhanced version of the script.
+            * Do **not** add introductions, explanations, notes, or comments.
+            * Do **not** say things like “Here’s the improved script.”
+            * Simply return the improved script text as the entire reply.
+
+            Your goal is to make the script read as if it was polished by a professional screenwriter or dialogue editor.
+
+            """
+            )
     
-    # For now, just append "ai" to the script as requested
-    enhanced_script = script + " ai"
-    
-    return Response({"enhanced_script": enhanced_script})
+    message = script
+    if not message:
+        return Response({'error': 'message required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Use consistent user_id
+    run_response = agent.run(message, user_id=str(request.user.id))
+    print(run_response.content)
+    return Response({"enhanced_script": run_response.content})

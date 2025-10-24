@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { useRouter } from 'next/navigation'
 import { useForm } from "react-hook-form"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,7 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-import { Camera, User, Mail, FileText, Calendar, MapPin, Link as LinkIcon, Loader2 } from "lucide-react"
+import { Camera, User, Mail, FileText, Calendar, MapPin, Link as LinkIcon, Loader2, LogOut } from "lucide-react"
 
 interface ProfileFormData {
   firstName: string
@@ -23,6 +24,7 @@ interface ProfileFormData {
 }
 
 export default function ProfilePage() {
+  const router = useRouter()
   const [isEditing, setIsEditing] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -44,6 +46,46 @@ export default function ProfilePage() {
       website: "",
     }
   })
+
+  // Check authentication
+  useEffect(() => {
+    const checkAuth = () => {
+      try {
+        const tokens = localStorage.getItem('voxvid_tokens')
+        if (!tokens) {
+          router.replace('/login')
+          return
+        }
+        
+        const parsedTokens = JSON.parse(tokens)
+        if (!parsedTokens.access) {
+          router.replace('/login')
+          return
+        }
+        
+        // Optional: Check if token is expired
+        try {
+          const payload = JSON.parse(atob(parsedTokens.access.split('.')[1]))
+          const currentTime = Date.now() / 1000
+          if (payload.exp < currentTime) {
+            localStorage.removeItem('voxvid_tokens')
+            router.replace('/login')
+            return
+          }
+        } catch (e) {
+          // If token parsing fails, redirect to login
+          localStorage.removeItem('voxvid_tokens')
+          router.replace('/login')
+          return
+        }
+      } catch (e) {
+        localStorage.removeItem('voxvid_tokens')
+        router.replace('/login')
+      }
+    }
+    
+    checkAuth()
+  }, [router])
 
   useEffect(() => {
     fetchProfile()
@@ -158,6 +200,38 @@ export default function ProfilePage() {
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
   }
 
+  const handleLogout = async () => {
+    try {
+      const API_URL = (process.env.NEXT_PUBLIC_API_URL as string) || 'http://127.0.0.1:8000'
+      const tokens = JSON.parse(localStorage.getItem('voxvid_tokens') || '{}')
+
+      // Call logout endpoint if it exists
+      try {
+        await fetch(`${API_URL}/api/auth/logout/`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${tokens.access}`,
+            'Content-Type': 'application/json',
+          },
+        })
+      } catch (error) {
+        // Ignore logout endpoint errors, proceed with local logout
+        console.log('Logout endpoint not available, proceeding with local logout')
+      }
+
+      // Clear local storage
+      localStorage.removeItem('voxvid_tokens')
+      
+      // Redirect to login
+      router.replace('/login')
+    } catch (error) {
+      console.error('Error during logout:', error)
+      // Force logout even if there's an error
+      localStorage.removeItem('voxvid_tokens')
+      router.replace('/login')
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background text-foreground p-6 flex items-center justify-center">
@@ -221,6 +295,15 @@ export default function ProfilePage() {
                   <div className="text-sm text-muted-foreground">Views</div>
                 </div>
               </div>
+              <Separator />
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={handleLogout}
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Logout
+              </Button>
               <Separator />
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-sm">

@@ -90,11 +90,32 @@ VoxVid/
    Create or update `Backend/.env`:
    ```env
    DDI_API_KEY=your_d_id_api_key_here
+   CEREBRUS_API_KEY=your_cerebrus_api_key_here
    SECRET_KEY=your_django_secret_key
    DEBUG=True
+   FRONTEND_URL=http://localhost:3000
+   
+   # Google Cloud Storage Configuration
+   GCP_SERVICE_ACCOUNT_FILE=/path/to/your/service-account-file.json
+   GCP_BUCKET_NAME=your-bucket-name
    ```
 
-6. **Run database migrations**
+6. **Set up Google Cloud Storage**
+   
+   - Create a Google Cloud Platform account at [https://console.cloud.google.com/](https://console.cloud.google.com/)
+   - Create a new project or select an existing one
+   - Enable the Cloud Storage API
+   - Create a service account:
+     - Go to IAM & Admin > Service Accounts
+     - Click "Create Service Account"
+     - Grant "Storage Admin" role
+     - Create and download a JSON key file
+   - Place the downloaded JSON file in the `Backend/` directory
+   - Update `GCP_SERVICE_ACCOUNT_FILE` in `.env` with the full path to this file
+   - Choose a unique bucket name and set it in `GCP_BUCKET_NAME`
+   - The bucket will be created automatically on first run with public read access
+
+7. **Run database migrations**
    ```bash
    python manage.py makemigrations
    python manage.py migrate
@@ -139,6 +160,16 @@ VoxVid/
 ```env
 # Required
 DDI_API_KEY=your_d_id_api_key_here
+CEREBRUS_API_KEY=your_cerebrus_api_key_here
+
+# Google Cloud Storage (Required for file uploads)
+GCP_SERVICE_ACCOUNT_FILE=/path/to/Backend/your-service-account-file.json
+GCP_BUCKET_NAME=your-unique-bucket-name
+
+# Optional
+FRONTEND_URL=http://localhost:3000
+SECRET_KEY=your_django_secret_key
+DEBUG=True
 ```
 
 ### Frontend (.env)
@@ -179,6 +210,54 @@ This project integrates with D-ID's API for AI video generation. You'll need:
 1. **D-ID Account**: Sign up at [D-ID](https://www.d-id.com/)
 2. **API Key**: Get your API key from the D-ID dashboard
 3. **Add to Environment**: Set `DDI_API_KEY` in your backend `.env` file
+
+## ☁️ Google Cloud Storage Setup
+
+VoxVid uses Google Cloud Storage for storing uploaded images and generated videos.
+
+### Prerequisites
+1. **GCP Account**: Create one at [https://console.cloud.google.com/](https://console.cloud.google.com/)
+2. **Billing Enabled**: Enable billing on your GCP project (free tier available)
+
+### Setup Steps
+
+1. **Create a GCP Project**
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Create a new project or select existing one
+
+2. **Enable Cloud Storage API**
+   - Navigate to APIs & Services > Library
+   - Search for "Cloud Storage API"
+   - Click Enable
+
+3. **Create Service Account**
+   - Go to IAM & Admin > Service Accounts
+   - Click "Create Service Account"
+   - Name it (e.g., "voxvid-storage")
+   - Grant role: "Storage Admin"
+   - Click "Done"
+
+4. **Generate JSON Key**
+   - Click on the created service account
+   - Go to "Keys" tab
+   - Click "Add Key" > "Create New Key"
+   - Select "JSON" format
+   - Download the key file (e.g., `cyoproject-476108-ff9e7996bc22.json`)
+
+5. **Configure Backend**
+   - Place the JSON file in the `Backend/` directory
+   - Update `Backend/.env`:
+     ```env
+     GCP_SERVICE_ACCOUNT_FILE=/absolute/path/to/Backend/your-key-file.json
+     GCP_BUCKET_NAME=your-unique-bucket-name
+     ```
+   - The bucket will be automatically created on first run with public read access
+
+### Bucket Configuration
+- The application automatically creates the bucket if it doesn't exist
+- Uniform Bucket-Level Access is enabled automatically
+- Public read access is configured for all uploaded files
+- Files are organized in folders: `images/` and `videos/`
 
 ## 🚀 Deployment
 

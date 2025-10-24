@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from 'next/navigation'
 import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,6 +12,7 @@ import { Separator } from "@/components/ui/separator"
 import { Moon, Sun, Bell, Globe, Shield, Palette } from "lucide-react"
 
 export default function SettingsPage() {
+  const router = useRouter()
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   const [notifications, setNotifications] = useState({
@@ -23,6 +25,46 @@ export default function SettingsPage() {
     profileVisible: true,
     dataSharing: false,
   })
+
+  // Check authentication
+  useEffect(() => {
+    const checkAuth = () => {
+      try {
+        const tokens = localStorage.getItem('voxvid_tokens')
+        if (!tokens) {
+          router.replace('/login')
+          return
+        }
+        
+        const parsedTokens = JSON.parse(tokens)
+        if (!parsedTokens.access) {
+          router.replace('/login')
+          return
+        }
+        
+        // Optional: Check if token is expired
+        try {
+          const payload = JSON.parse(atob(parsedTokens.access.split('.')[1]))
+          const currentTime = Date.now() / 1000
+          if (payload.exp < currentTime) {
+            localStorage.removeItem('voxvid_tokens')
+            router.replace('/login')
+            return
+          }
+        } catch (e) {
+          // If token parsing fails, redirect to login
+          localStorage.removeItem('voxvid_tokens')
+          router.replace('/login')
+          return
+        }
+      } catch (e) {
+        localStorage.removeItem('voxvid_tokens')
+        router.replace('/login')
+      }
+    }
+    
+    checkAuth()
+  }, [router])
 
   useEffect(() => {
     setMounted(true)
