@@ -41,8 +41,10 @@ VoxVid/
 - **Django 5.2+** - Web framework
 - **Django REST Framework** - API development
 - **JWT Authentication** - Secure user authentication
-- **SQLite** - Database (development)
+- **SQLite/PostgreSQL** - Database (SQLite for development, PostgreSQL for production)
+- **Google Cloud Storage** - File storage for images and videos
 - **D-ID API** - AI video generation service
+- **Cerebras API** - AI script enhancement
 - **CORS Headers** - Cross-origin resource sharing
 
 ### Frontend
@@ -59,7 +61,8 @@ VoxVid/
 
 - **Python 3.8+**
 - **Node.js 18+**
-- **pnpm** 
+- **pnpm**
+- **Google Cloud Platform Account** (for file storage)
 
 ### Backend Setup
 
@@ -95,33 +98,21 @@ VoxVid/
    DEBUG=True
    FRONTEND_URL=http://localhost:3000
    
-   # Google Cloud Storage Configuration
-   GCP_SERVICE_ACCOUNT_FILE=/path/to/your/service-account-file.json
-   GCP_BUCKET_NAME=your-bucket-name
+   # Database (optional - defaults to SQLite)
+   # DATABASE_URL=postgresql://user:password@host:port/database
+   
+   # Google Cloud Storage (Required for file uploads)
+   GCP_SERVICE_ACCOUNT_FILE=/path/to/Backend/your-service-account-file.json
+   GCP_BUCKET_NAME=your-unique-bucket-name
    ```
 
-6. **Set up Google Cloud Storage**
-   
-   - Create a Google Cloud Platform account at [https://console.cloud.google.com/](https://console.cloud.google.com/)
-   - Create a new project or select an existing one
-   - Enable the Cloud Storage API
-   - Create a service account:
-     - Go to IAM & Admin > Service Accounts
-     - Click "Create Service Account"
-     - Grant "Storage Admin" role
-     - Create and download a JSON key file
-   - Place the downloaded JSON file in the `Backend/` directory
-   - Update `GCP_SERVICE_ACCOUNT_FILE` in `.env` with the full path to this file
-   - Choose a unique bucket name and set it in `GCP_BUCKET_NAME`
-   - The bucket will be created automatically on first run with public read access
-
-7. **Run database migrations**
+6. **Run database migrations**
    ```bash
    python manage.py makemigrations
    python manage.py migrate
    ```
 
-8. **Start the development server**
+7. **Start the development server**
    ```bash
    python manage.py runserver
    ```
@@ -163,8 +154,11 @@ DDI_API_KEY=your_d_id_api_key_here
 CEREBRUS_API_KEY=your_cerebrus_api_key_here
 
 # Google Cloud Storage (Required for file uploads)
-GCP_SERVICE_ACCOUNT_FILE=/path/to/Backend/your-service-account-file.json
+GCP_SERVICE_ACCOUNT_FILE=/absolute/path/to/Backend/your-service-account-file.json
 GCP_BUCKET_NAME=your-unique-bucket-name
+
+# Database (Optional - defaults to SQLite)
+# DATABASE_URL=postgresql://user:password@host:port/database?sslmode=require
 
 # Optional
 FRONTEND_URL=http://localhost:3000
@@ -193,11 +187,16 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 - `GET /api/videos/{id}/` - Get specific video
 - `POST /api/videos/{id}/update/` - Update video status
 
+### AI Enhancement
+- `POST /api/ai/enhance-script/` - Enhance script using AI
+
 ## 🎯 Key Features
 
 - **AI Video Generation**: Convert text scripts to professional videos
 - **Avatar Selection**: Choose from various AI avatars
 - **Voice Synthesis**: Multiple voice options for narration
+- **Cloud File Storage**: Secure storage of images and videos on Google Cloud
+- **Script Enhancement**: AI-powered script improvement using Cerebras API
 - **User Authentication**: Secure JWT-based authentication
 - **Video Management**: Track and manage generated videos
 - **Responsive Design**: Works on desktop and mobile devices
@@ -218,46 +217,47 @@ VoxVid uses Google Cloud Storage for storing uploaded images and generated video
 ### Prerequisites
 1. **GCP Account**: Create one at [https://console.cloud.google.com/](https://console.cloud.google.com/)
 2. **Billing Enabled**: Enable billing on your GCP project (free tier available)
+3. **Project Created**: Create a new project or select an existing one
 
 ### Setup Steps
 
-1. **Create a GCP Project**
-   - Go to [Google Cloud Console](https://console.cloud.google.com/)
-   - Create a new project or select existing one
-
-2. **Enable Cloud Storage API**
+1. **Enable Cloud Storage API**
    - Navigate to APIs & Services > Library
    - Search for "Cloud Storage API"
    - Click Enable
 
-3. **Create Service Account**
+2. **Create Service Account**
    - Go to IAM & Admin > Service Accounts
    - Click "Create Service Account"
    - Name it (e.g., "voxvid-storage")
-   - Grant role: "Storage Admin"
+   - **Important**: Grant role "Storage Admin" (not just "Storage Object Admin")
    - Click "Done"
 
-4. **Generate JSON Key**
+3. **Generate JSON Key**
    - Click on the created service account
    - Go to "Keys" tab
    - Click "Add Key" > "Create New Key"
    - Select "JSON" format
-   - Download the key file (e.g., `cyoproject-476108-ff9e7996bc22.json`)
+   - Download the key file
 
-5. **Configure Backend**
+4. **Configure Application**
    - Place the JSON file in the `Backend/` directory
-   - Update `Backend/.env`:
+   - Update `Backend/.env` with the correct paths:
      ```env
-     GCP_SERVICE_ACCOUNT_FILE=/absolute/path/to/Backend/your-key-file.json
-     GCP_BUCKET_NAME=your-unique-bucket-name
+     GCP_SERVICE_ACCOUNT_FILE=/home/ramachandra/Music/VoxVid/Backend/your-key-file.json
+     GCP_BUCKET_NAME=voxvid-bucket
      ```
-   - The bucket will be automatically created on first run with public read access
 
-### Bucket Configuration
+### Automatic Bucket Management
 - The application automatically creates the bucket if it doesn't exist
 - Uniform Bucket-Level Access is enabled automatically
 - Public read access is configured for all uploaded files
 - Files are organized in folders: `images/` and `videos/`
+
+### Troubleshooting GCP Issues
+- **Permission Denied**: Ensure service account has "Storage Admin" role
+- **Bucket Creation Failed**: Check if bucket name is globally unique
+- **File Upload Failed**: Verify JSON key file path and permissions
 
 ## 🚀 Deployment
 
@@ -273,18 +273,6 @@ VoxVid uses Google Cloud Storage for storing uploaded images and generated video
 - Deploy to Vercel, Netlify, or similar platform
 - Update `NEXT_PUBLIC_API_URL` to your production API URL
 
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature-name`
-3. Commit changes: `git commit -am 'Add feature'`
-4. Push to branch: `git push origin feature-name`
-5. Submit a Pull Request
-
-## 📝 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
 ## 🆘 Troubleshooting
 
 ### Common Issues
@@ -293,12 +281,16 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 2. **API Key Issues**: Verify D-ID API key is correctly set in backend `.env`
 3. **Database Issues**: Run migrations with `python manage.py migrate`
 4. **Port Conflicts**: Change ports in development if 3000/8000 are occupied
+5. **GCP Permission Errors**: Ensure service account has "Storage Admin" role, not just "Storage Object Admin"
+6. **GCP Bucket Creation Failed**: Choose a globally unique bucket name
+7. **File Upload Errors**: Verify the JSON key file path and permissions
 
-### Getting Help
+### GCP-Specific Issues
 
-- Check the [Issues](https://github.com/Ramachandra-2k96/VoxVid/issues) page
-- Create a new issue with detailed description
-- Include error messages and environment details
+- **"does not have storage.buckets.get access"**: Service account needs "Storage Admin" role
+- **"Bucket already exists"**: Choose a different bucket name
+- **"Invalid credentials"**: Check JSON key file path and contents
+- **File uploads fail silently**: Check Django logs for detailed error messages
 
 ## 🔗 Links
 
