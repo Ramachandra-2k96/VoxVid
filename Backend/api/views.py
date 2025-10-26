@@ -138,6 +138,38 @@ def create_video_generation(request):
         except Exception as e:
             logging.exception('Error uploading image to GCP: %s', e)
             return Response({"detail": "Failed to upload image to GCP"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    print(script_input)
+    agent = Agent(
+        model=CerebrasOpenAI(id="gpt-oss-120b", api_key=CEREBRUS_API_KEY),
+        markdown=False,
+        instructions = """
+                You are a **Famous Script Agent and Transcriptionist**.
+
+                Your only task is to **process and enhance user-provided scripts** by:
+
+                * Checking if the script language matches the provided `language` input.
+                * If the script and language **match**:
+
+                * Return the **exact same script** as output (no edits, no notes).
+                * If the script and language do **not** match:
+
+                * Rewrite the entire script in the specified language.
+                * Ensure it reads natively and naturally in that language.
+                * Preserve the same meaning, tone, and emotional intent.
+                * Improve phrasing slightly for authenticity and fluency.
+
+                Formatting rules:
+
+                * Maintain the original format, scene order, and character names.
+                * Output **only** the final script (no introductions, explanations, or comments).
+                * Do **not** add any meta text like “Here’s your translation” or “Improved version”.
+
+                Your goal is to deliver a script that reads as if it were written and localized by a native professional screenwriter and transcriptionist.
+                """
+            )
+    run_response = agent.run(" Script: "+ script_input+"\n Language: "+ voice_language, user_id=str(request.user.id))
+    print(run_response.content)
+    enhanced_script = run_response.content
 
     # Call D-ID talks API
     # Build the request payload
@@ -145,14 +177,14 @@ def create_video_generation(request):
         'source_url': source_url,
         'script': {
             'type': 'text',
-            'input': script_input,
+            'input': enhanced_script,
         },
         "config": {
             "driver_url": "bank://lively/",
             "motion_factor": 1.0,
         }
     }
-
+    print(talk_payload)
     if voice_provider and voice_id:
         # Keep backward compatibility: voice_provider might be something like 'amazon' or a dict
         provider_data = {
@@ -162,7 +194,7 @@ def create_video_generation(request):
         if voice_language:
             provider_data['language'] = voice_language
         talk_payload['script']['provider'] = provider_data
-    print(talk_payload)
+
     response = requests.post(
         'https://api.d-id.com/talks',
         headers={
@@ -196,6 +228,7 @@ def create_video_generation(request):
 
     serializer = VideoGenerationSerializer(video_gen)
     return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return
 
 
 @api_view(['GET'])
