@@ -97,6 +97,7 @@ def logout_view(request):
 @permission_classes([IsAuthenticated])
 def create_video_generation(request):
     name = request.data.get('name')
+    input_type = request.data.get('input_type', 'text')  # 'text' or 'voice'
     script_input = request.data.get('script_input')
     voice_provider = request.data.get('voice_provider')  # e.g., 'microsoft', 'elevenlabs'
     voice_id = request.data.get('voice_id')  # e.g., 'en-US-JennyNeural'
@@ -106,9 +107,22 @@ def create_video_generation(request):
     # or a direct source_url (for backward compatibility)
     uploaded_file = request.FILES.get('image_file') if hasattr(request, 'FILES') else None
     source_url = request.data.get('source_url') if not uploaded_file else None
+    
+    # Accept audio file for voice input type
+    audio_file = request.FILES.get('audio_file') if hasattr(request, 'FILES') else None
 
-    if not all([name, script_input]) or (not source_url and not uploaded_file):
-        return Response({"detail": "name, image_file or source_url, and script_input are required"}, status=status.HTTP_400_BAD_REQUEST)
+    # Validation based on input type
+    if not name:
+        return Response({"detail": "name is required"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    if not uploaded_file and not source_url:
+        return Response({"detail": "image_file or source_url is required"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    if input_type == 'text' and not script_input:
+        return Response({"detail": "script_input is required for text input type"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    if input_type == 'voice' and not audio_file:
+        return Response({"detail": "audio_file is required for voice input type"}, status=status.HTTP_400_BAD_REQUEST)
 
     did_api_key = getattr(settings, 'DDI_API_KEY', None)
     if not did_api_key:
@@ -138,8 +152,45 @@ def create_video_generation(request):
         except Exception as e:
             logging.exception('Error uploading image to GCP: %s', e)
             return Response({"detail": "Failed to upload image to GCP"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    print(script_input)
-    agent = Agent(
+
+    # Build the request payload based on input type
+    talk_payload = {
+        'source_url': source_url,
+        "config": {
+            "driver_url": "bank://lively/",
+            "motion_factor": 1.0,
+            "stitch": True,
+        }
+    }
+
+    if input_type == 'voice':
+        # Upload audio file to GCP
+        gcp_audio_url = None
+        if audio_file and isinstance(audio_file, InMemoryUploadedFile):
+            try:
+                # Generate unique blob name for the audio
+                blob_name = generate_unique_blob_name('audio', audio_file.name)
+                
+                # Upload to GCP and get public URL
+                gcp_audio_url = upload_file_object_to_gcp(audio_file, blob_name)
+                
+            except Exception as e:
+                logging.exception('Error uploading audio to GCP: %s', e)
+                return Response({"detail": "Failed to upload audio to GCP"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        if not gcp_audio_url:
+            return Response({"detail": "Failed to get audio URL"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        # For voice input, use audio type
+        talk_payload['script'] = {
+            'type': 'audio',
+            'audio_url': gcp_audio_url
+        }
+        
+    else:
+        # For text input, process with AI and use text type
+        print(script_input)
+        agent = Agent(
         model=CerebrasOpenAI(id="gpt-oss-120b", api_key=CEREBRUS_API_KEY),
         markdown=False,
         instructions = """
@@ -167,33 +218,26 @@ def create_video_generation(request):
                 Your goal is to deliver a script that reads as if it were written and localized by a native professional screenwriter and transcriptionist.
                 """
             )
-    run_response = agent.run(" Script: "+ script_input+"\n Language: "+ voice_language, user_id=str(request.user.id))
-    print(run_response.content)
-    enhanced_script = run_response.content
+        run_response = agent.run(" Script: "+ script_input+"\n Language: "+ voice_language, user_id=str(request.user.id))
+        print(run_response.content)
+        enhanced_script = run_response.content
 
-    # Call D-ID talks API
-    # Build the request payload
-    talk_payload = {
-        'source_url': source_url,
-        'script': {
+        talk_payload['script'] = {
             'type': 'text',
             'input': enhanced_script,
-        },
-        "config": {
-            "driver_url": "bank://lively/",
-            "motion_factor": 1.0,
         }
-    }
+        
+        if voice_provider and voice_id:
+            # Keep backward compatibility: voice_provider might be something like 'amazon' or a dict
+            provider_data = {
+                'type': voice_provider,
+                'voice_id': voice_id
+            }
+            if voice_language:
+                provider_data['language'] = voice_language
+            talk_payload['script']['provider'] = provider_data
+
     print(talk_payload)
-    if voice_provider and voice_id:
-        # Keep backward compatibility: voice_provider might be something like 'amazon' or a dict
-        provider_data = {
-            'type': voice_provider,
-            'voice_id': voice_id
-        }
-        if voice_language:
-            provider_data['language'] = voice_language
-        talk_payload['script']['provider'] = provider_data
 
     response = requests.post(
         'https://api.d-id.com/talks',
@@ -218,17 +262,16 @@ def create_video_generation(request):
         user=request.user,
         name=name,
         source_url=gcp_image_url or source_url,  # Store GCP URL
-        script_input=script_input,
+        script_input=script_input if script_input else "",
         talk_id=talk_id,
         status='created',
-        voice_provider=voice_provider,
-        voice_id=voice_id,
+        voice_provider=voice_provider or 'Custom',
+        voice_id=voice_id or 'Custom_voice_id',
         config={'fluent': False, 'pad_audio': 0.0},
     )
 
     serializer = VideoGenerationSerializer(video_gen)
     return Response(serializer.data, status=status.HTTP_201_CREATED)
-    return
 
 
 @api_view(['GET'])

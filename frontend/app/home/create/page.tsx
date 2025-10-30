@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -59,6 +59,9 @@ interface CreateData {
   voiceId: string
   voiceName: string
   voiceLanguage: string
+  inputType: 'text' | 'voice'
+  audioFile: File | null
+  audioPreview: string
 }
 
 export default function CreateProjectPage() {
@@ -74,6 +77,12 @@ export default function CreateProjectPage() {
   const [selectedLanguage, setSelectedLanguage] = useState<string>('all')
   const [selectedGender, setSelectedGender] = useState<string>('all')
   const [availableLanguages, setAvailableLanguages] = useState<string[]>([])
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const recordedChunksRef = useRef<Blob[]>([])
+  const [isRecording, setIsRecording] = useState(false)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  
   
   const [formData, setFormData] = useState<CreateData>({
     name: '',
@@ -83,8 +92,36 @@ export default function CreateProjectPage() {
     voiceProvider: 'microsoft',
     voiceId: '',
     voiceName: '',
-    voiceLanguage: ''
+    voiceLanguage: '',
+    inputType: 'text',
+    audioFile: null,
+    audioPreview: ''
   })
+
+  // Ensure audio element picks up new source URLs created via createObjectURL
+  // and revoke previous object URLs to avoid memory leaks.
+  const prevAudioUrlRef = useRef<string | null>(null)
+  useEffect(() => {
+    const url = formData.audioPreview
+    if (!url) return
+
+    // If we changed from a previous blob URL, revoke it
+    if (prevAudioUrlRef.current && prevAudioUrlRef.current.startsWith('blob:') && prevAudioUrlRef.current !== url) {
+      try { URL.revokeObjectURL(prevAudioUrlRef.current) } catch (e) { /* ignore */ }
+    }
+    prevAudioUrlRef.current = url
+
+    if (audioRef.current) {
+      try {
+        // Some browsers require calling load() after changing sources
+        // Set src directly for reliability then load
+        audioRef.current.src = url
+        audioRef.current.load()
+      } catch (e) {
+        // fallback: do nothing
+      }
+    }
+  }, [formData.audioPreview])
 
   const providers = ['amazon', 'microsoft', 'elevenlabs', 'google', 'playHT']
 
@@ -131,45 +168,82 @@ export default function CreateProjectPage() {
   }, [router])
 
   // Load voices when provider changes
+  // Prefetch voices for all providers once when entering step 4.
+  // This avoids repeated API calls each time the user clicks a provider.
   useEffect(() => {
-    if (currentStep === 4 && selectedProvider && !voices[selectedProvider]) {
-      loadVoices(selectedProvider)
-    }
-  }, [currentStep, selectedProvider])
-
-  const loadVoices = async (provider: string) => {
-    setIsLoadingVoices(true)
-    try {
-      const response = await fetch(
-        `https://api.d-id.com/tts/voices?provider=${provider}`,
-        {
-          headers: {
-            'accept': 'application/json',
-            'authorization': 'Basic YkdWc1lYSTVNemM1TWtCbllXMWxaM1JoTG1OdmJROmpIZXFrUks3LXVHWTFwcVB1d2Z6MDo='
-          }
+    const loadAllVoices = async (providerList: string[] = providers) => {
+      setIsLoadingVoices(true)
+      try {
+        const header = {
+          'accept': 'application/json',
+          'authorization': 'Basic YkdWc1lYSTVNemM1TWtCbllXMWxaM1JoTG1OdmJROmpIZXFrUks3LXVHWTFwcVB1d2Z6MDo='
         }
-      )
-      if (response.ok) {
-        const data = await response.json()
-        setVoices(prev => ({ ...prev, [provider]: data }))
-        
-        // Extract all unique languages from the voices
-        const languages = new Set<string>()
-        data.forEach((voice: VoiceOption) => {
-          voice.languages?.forEach(lang => {
-            if (lang.language) {
-              languages.add(lang.language)
+
+        const fetches = providerList.map(async (provider) => {
+          try {
+            const res = await fetch(
+              `https://api.d-id.com/tts/voices?provider=${provider}`,
+              { headers: header }
+            )
+            if (res.ok) {
+              const data = await res.json()
+              return { provider, data }
             }
-          })
+          } catch (e) {
+            console.error(`Error loading voices for ${provider}:`, e)
+          }
+          return { provider, data: [] }
         })
-        setAvailableLanguages(Array.from(languages).sort())
+
+        const results = await Promise.all(fetches)
+
+        setVoices(prev => {
+          const next = { ...prev }
+          results.forEach(r => {
+            next[r.provider] = r.data
+          })
+          return next
+        })
+
+        // Note: do not set availableLanguages here — compute languages per selected provider
+        // so filters stay in sync when the user switches providers. A separate effect
+        // below will derive availableLanguages from `voices[selectedProvider]`.
+      } catch (error) {
+        console.error('Error loading voices:', error)
+      } finally {
+        setIsLoadingVoices(false)
       }
-    } catch (error) {
-      console.error('Error loading voices:', error)
-    } finally {
-      setIsLoadingVoices(false)
     }
-  }
+
+    if (currentStep === 4) {
+      // If no provider data loaded yet, fetch for all providers (or only missing)
+      const missing = providers.filter(p => !voices[p])
+      if (missing.length > 0) {
+        loadAllVoices(missing)
+      }
+    }
+  }, [currentStep])
+
+  // Keep availableLanguages in sync with the currently selected provider's voices.
+  // Also reset selectedLanguage to 'all' if the currently selected language is not
+  // available for the active provider.
+  useEffect(() => {
+    const arr = voices[selectedProvider] || []
+    const langs = new Set<string>()
+    arr.forEach((voice: VoiceOption) => {
+      voice.languages?.forEach(lang => {
+        if (lang.language) langs.add(lang.language)
+      })
+    })
+
+    const newLangs = Array.from(langs).sort()
+    setAvailableLanguages(newLangs)
+
+    if (selectedLanguage !== 'all' && !newLangs.includes(selectedLanguage)) {
+      setSelectedLanguage('all')
+    }
+  }, [selectedProvider, voices])
+
 
   const handlePlayVoice = (voiceId: string, previewUrl: string) => {
     // Stop any currently playing audio
@@ -217,9 +291,15 @@ export default function CreateProjectPage() {
       alert('Please enter a project name')
       return
     }
-    if (currentStep === 2 && !formData.script.trim()) {
-      alert('Please enter a script')
-      return
+    if (currentStep === 2) {
+      if (formData.inputType === 'text' && !formData.script.trim()) {
+        alert('Please enter a script')
+        return
+      }
+      if (formData.inputType === 'voice' && !formData.audioFile) {
+        alert('Please upload or record audio')
+        return
+      }
     }
     if (currentStep === 3 && !formData.imageFile) {
       alert('Please upload an image')
@@ -231,13 +311,23 @@ export default function CreateProjectPage() {
     }
 
     if (currentStep < totalSteps) {
-      setCurrentStep(currentStep + 1)
+      // Skip step 4 (voice selection) if user uploaded voice
+      if (currentStep === 3 && formData.inputType === 'voice') {
+        setCurrentStep(5)
+      } else {
+        setCurrentStep(currentStep + 1)
+      }
     }
   }
 
   const handleBack = () => {
     if (currentStep > 1) {
-      setCurrentStep(currentStep - 1)
+      // Skip step 4 (voice selection) if user uploaded voice and going back from step 5
+      if (currentStep === 5 && formData.inputType === 'voice') {
+        setCurrentStep(3)
+      } else {
+        setCurrentStep(currentStep - 1)
+      }
     }
   }
 
@@ -309,12 +399,19 @@ export default function CreateProjectPage() {
       
       const form = new FormData()
       form.append('name', formData.name)
-      form.append('script_input', formData.script)
-      form.append('voice_provider', formData.voiceProvider)
-      form.append('voice_id', formData.voiceId)
-      if (formData.voiceLanguage) {
-        form.append('voice_language', formData.voiceLanguage)
+      form.append('input_type', formData.inputType)
+      
+      if (formData.inputType === 'text') {
+        form.append('script_input', formData.script)
+        form.append('voice_provider', formData.voiceProvider)
+        form.append('voice_id', formData.voiceId)
+        if (formData.voiceLanguage) {
+          form.append('voice_language', formData.voiceLanguage)
+        }
+      } else if (formData.inputType === 'voice' && formData.audioFile) {
+        form.append('audio_file', formData.audioFile)
       }
+      
       if (formData.imageFile) {
         form.append('image_file', formData.imageFile)
       }
@@ -383,43 +480,211 @@ export default function CreateProjectPage() {
               <div className="w-16 h-16 rounded-full bg-gradient-to-r from-cyan-500/20 via-orange-500/20 to-pink-500/20 flex items-center justify-center mx-auto mb-4">
                 <Wand2 className="h-8 w-8 text-primary" />
               </div>
-              <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Write Your Script</h2>
-              <p className="text-muted-foreground">The AI will convert this to speech and animate your avatar</p>
+              <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Add Your Content</h2>
+              <p className="text-muted-foreground">Choose between text script or voice audio</p>
             </div>
 
-            <div className="max-w-2xl mx-auto space-y-4">
-              <div className="relative">
-                <Label htmlFor="script" className="text-base font-medium">Script</Label>
-                <Textarea
-                  id="script"
-                  placeholder="Enter your script here... This text will be converted to speech by AI."
-                  value={formData.script}
-                  onChange={(e) => setFormData(prev => ({ ...prev, script: e.target.value }))}
-                  rows={10}
-                  className="mt-2 text-base bg-background border-border focus:border-primary resize-none"
-                />
-                <div className="absolute bottom-4 right-4">
-                  <Button
-                    type="button"
-                    onClick={handleAIEnhance}
-                    disabled={isEnhancing || !formData.script.trim()}
-                    size="sm"
-                    className="bg-gradient-to-r from-cyan-500 via-orange-500 to-pink-500 hover:opacity-90 text-white"
-                    title="AI Enhanced Script"
-                  >
-                    {isEnhancing ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : (
-                      <Sparkles className="h-4 w-4 mr-2" />
-                    )}
-                    {isEnhancing ? 'Enhancing...' : 'AI Enhance'}
-                  </Button>
-                </div>
+            <div className="max-w-2xl mx-auto space-y-6">
+              {/* Input Type Selector */}
+              <div className="flex gap-4 justify-center">
+                <Button
+                  type="button"
+                  variant={formData.inputType === 'text' ? 'default' : 'outline'}
+                  onClick={() => setFormData(prev => ({ ...prev, inputType: 'text' }))}
+                  className={formData.inputType === 'text' ? 'bg-gradient-to-r from-cyan-500 via-orange-500 to-pink-500 text-white' : ''}
+                >
+                  <FileText className="mr-2 h-4 w-4" />
+                  Text Script
+                </Button>
+                <Button
+                  type="button"
+                  variant={formData.inputType === 'voice' ? 'default' : 'outline'}
+                  onClick={() => setFormData(prev => ({ ...prev, inputType: 'voice' }))}
+                  className={formData.inputType === 'voice' ? 'bg-gradient-to-r from-cyan-500 via-orange-500 to-pink-500 text-white' : ''}
+                >
+                  <Mic className="mr-2 h-4 w-4" />
+                  Voice Audio
+                </Button>
               </div>
 
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>{formData.script.length} characters</span>
-              </div>
+              {/* Text Input */}
+              {formData.inputType === 'text' && (
+                <div className="relative">
+                  <Label htmlFor="script" className="text-base font-medium">Script</Label>
+                  <Textarea
+                    id="script"
+                    placeholder="Enter your script here... This text will be converted to speech by AI."
+                    value={formData.script}
+                    onChange={(e) => setFormData(prev => ({ ...prev, script: e.target.value }))}
+                    rows={10}
+                    className="mt-2 text-base bg-background border-border focus:border-primary resize-none"
+                  />
+                  <div className="absolute bottom-4 right-4">
+                    <Button
+                      type="button"
+                      onClick={handleAIEnhance}
+                      disabled={isEnhancing || !formData.script.trim()}
+                      size="sm"
+                      className="bg-gradient-to-r from-cyan-500 via-orange-500 to-pink-500 hover:opacity-90 text-white"
+                      title="AI Enhanced Script"
+                    >
+                      {isEnhancing ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <Sparkles className="h-4 w-4 mr-2" />
+                      )}
+                      {isEnhancing ? 'Enhancing...' : 'AI Enhance'}
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
+                    <span>{formData.script.length} characters</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Voice Input */}
+              {formData.inputType === 'voice' && (
+                <div className="space-y-4">
+                  <Label className="text-base font-medium">Audio Input</Label>
+                  
+                  {!formData.audioPreview ? (
+                    <div className="space-y-4">
+                      {/* File Upload */}
+                      <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-border rounded-lg cursor-pointer bg-muted/20 hover:bg-muted/30 transition-colors">
+                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                          <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                          <p className="mb-1 text-sm text-muted-foreground">
+                            <span className="font-semibold">Click to upload audio</span>
+                          </p>
+                          <p className="text-xs text-muted-foreground">MP3, WAV, M4A (MAX. 10MB)</p>
+                        </div>
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept="audio/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) {
+                              // Use object URL for playback (lighter than full data URL)
+                              const url = URL.createObjectURL(file)
+                              setFormData(prev => ({
+                                ...prev,
+                                audioFile: file,
+                                audioPreview: url
+                              }))
+                            }
+                          }}
+                        />
+                      </label>
+
+                      <div className="text-center text-sm text-muted-foreground">or</div>
+
+                      {/* Voice Recorder Placeholder */}
+                      <Card className="bg-card border-border">
+                        <CardContent className="p-6 text-center">
+                          <Mic className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                          <p className="text-sm text-muted-foreground mb-4">Record your voice directly</p>
+                          <div className="flex items-center justify-center gap-3">
+                            {!isRecording ? (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={async () => {
+                                  try {
+                                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+                                    recordedChunksRef.current = []
+                                    const mr = new MediaRecorder(stream)
+                                    mediaRecorderRef.current = mr
+                                    mr.ondataavailable = (e) => {
+                                      if (e.data && e.data.size > 0) recordedChunksRef.current.push(e.data)
+                                    }
+                                    mr.onstop = () => {
+                                      const blob = new Blob(recordedChunksRef.current, { type: recordedChunksRef.current[0]?.type || 'audio/webm' })
+                                      const file = new File([blob], `recording.${blob.type.split('/')[1] || 'webm'}`, { type: blob.type })
+                                      const url = URL.createObjectURL(blob)
+                                      setFormData(prev => ({ ...prev, audioFile: file, audioPreview: url }))
+                                      // stop all tracks
+                                      stream.getTracks().forEach(t => t.stop())
+                                      setIsRecording(false)
+                                      mediaRecorderRef.current = null
+                                    }
+                                    mr.start()
+                                    setIsRecording(true)
+                                  } catch (err) {
+                                    console.error('Microphone access denied or error:', err)
+                                    alert('Could not access microphone. Please allow microphone permissions or upload an audio file.')
+                                  }
+                                }}
+                              >
+                                <Mic className="mr-2 h-4 w-4" />
+                                Start Recording
+                              </Button>
+                            ) : (
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                onClick={() => {
+                                  try {
+                                    const mr = mediaRecorderRef.current
+                                    if (mr && mr.state !== 'inactive') {
+                                      mr.stop()
+                                    }
+                                  } catch (e) {
+                                    console.error('Error stopping recorder', e)
+                                  } finally {
+                                    setIsRecording(false)
+                                  }
+                                }}
+                              >
+                                <Mic className="mr-2 h-4 w-4" />
+                                Stop Recording
+                              </Button>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <Card className="bg-card border-border">
+                        <CardContent className="p-6">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <Volume2 className="h-8 w-8 text-primary" />
+                              <div>
+                                <p className="font-medium">{formData.audioFile?.name || 'Recorded Audio'}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {formData.audioFile ? `${(formData.audioFile.size / 1024 / 1024).toFixed(2)} MB` : 'Audio ready'}
+                                </p>
+                              </div>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => {
+                                // revoke object URL if it was created
+                                try {
+                                  if (formData.audioPreview && formData.audioPreview.startsWith('blob:')) {
+                                    URL.revokeObjectURL(formData.audioPreview)
+                                  }
+                                } catch (e) {
+                                  // ignore
+                                }
+                                setFormData(prev => ({ ...prev, audioFile: null, audioPreview: '' }))
+                              }}
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                          <audio ref={audioRef} controls className="w-full mt-3" src={formData.audioPreview}>
+                            Your browser does not support the audio element.
+                          </audio>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )
@@ -490,6 +755,30 @@ export default function CreateProjectPage() {
               <p className="text-muted-foreground">Select the perfect voice for your video</p>
             </div>
 
+            {/* Top navigation for voice selection (Back / Next at top as requested) */}
+            <div className="flex justify-between mt-2 max-w-2xl mx-auto items-center">
+              <Button
+                onClick={handleBack}
+                variant="outline"
+                className="w-32"
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back
+              </Button>
+
+              <div className="text-sm text-muted-foreground">Step {currentStep} of {totalSteps}</div>
+
+              <div className="ml-4">
+                <Button
+                  onClick={handleNext}
+                  className="w-32 bg-gradient-to-r from-cyan-500 via-orange-500 to-pink-500 hover:opacity-90 text-white"
+                >
+                  Next
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
             {/* Provider Filter */}
             <div className="flex flex-wrap gap-2 justify-center mb-6">
               {providers.map((provider) => (
@@ -558,12 +847,18 @@ export default function CreateProjectPage() {
                         const hasLanguage = voice.languages?.some(lang => lang.language === selectedLanguage)
                         if (!hasLanguage) return false
                       }
-                      
-                      // Apply gender filter
+
+                      // Apply gender filter (normalize values)
                       if (selectedGender !== 'all') {
-                        if (voice.gender !== selectedGender) return false
+                        const filterGender = selectedGender.toLowerCase().trim()
+                        const voiceGender = (voice.gender || '').toLowerCase().trim()
+
+                        // If voiceGender is missing or unexpected, treat it as a non-match
+                        if (!voiceGender) return false
+
+                        if (voiceGender !== filterGender) return false
                       }
-                      
+
                       return true
                     })
                     .map((voice) => {
@@ -694,11 +989,38 @@ export default function CreateProjectPage() {
                   </div>
 
                   <div>
-                    <Label className="text-sm text-muted-foreground">Script</Label>
-                    <div className="mt-1 p-3 bg-muted/30 rounded-lg max-h-32 overflow-y-auto">
-                      <p className="text-sm text-foreground">{formData.script}</p>
-                    </div>
+                    <Label className="text-sm text-muted-foreground">Input Type</Label>
+                    <p className="text-base font-medium text-foreground mt-1 capitalize">{formData.inputType}</p>
                   </div>
+
+                  {formData.inputType === 'text' && (
+                    <div>
+                      <Label className="text-sm text-muted-foreground">Script</Label>
+                      <div className="mt-1 p-3 bg-muted/30 rounded-lg max-h-32 overflow-y-auto">
+                        <p className="text-sm text-foreground">{formData.script}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {formData.inputType === 'voice' && formData.audioPreview && (
+                    <div>
+                      <Label className="text-sm text-muted-foreground">Audio</Label>
+                      <div className="mt-2">
+                        <div className="flex items-center gap-3 mb-2">
+                          <Volume2 className="h-6 w-6 text-primary" />
+                          <div>
+                            <p className="font-medium text-sm">{formData.audioFile?.name || 'Recorded Audio'}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {formData.audioFile ? `${(formData.audioFile.size / 1024 / 1024).toFixed(2)} MB` : ''}
+                            </p>
+                          </div>
+                        </div>
+                        <audio controls className="w-full" src={formData.audioPreview}>
+                          Your browser does not support the audio element.
+                        </audio>
+                      </div>
+                    </div>
+                  )}
 
                   <div>
                     <Label className="text-sm text-muted-foreground">Avatar Image</Label>
@@ -711,12 +1033,14 @@ export default function CreateProjectPage() {
                     )}
                   </div>
 
-                  <div>
-                    <Label className="text-sm text-muted-foreground">Voice</Label>
-                    <p className="text-base font-medium text-foreground mt-1">
-                      {formData.voiceName} ({formData.voiceProvider})
-                    </p>
-                  </div>
+                  {formData.inputType === 'text' && (
+                    <div>
+                      <Label className="text-sm text-muted-foreground">Voice</Label>
+                      <p className="text-base font-medium text-foreground mt-1">
+                        {formData.voiceName} ({formData.voiceProvider})
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -787,28 +1111,30 @@ export default function CreateProjectPage() {
           {renderStepContent()}
         </div>
 
-        {/* Navigation */}
-        <div className="flex justify-between mt-8 max-w-2xl mx-auto">
-          <Button
-            onClick={handleBack}
-            variant="outline"
-            disabled={currentStep === 1}
-            className="w-32"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-          </Button>
-
-          {currentStep < totalSteps && (
+        {/* Navigation - hidden for step 4 (we show top nav inside that step) */}
+        {currentStep !== 4 && (
+          <div className="flex justify-between mt-8 max-w-2xl mx-auto">
             <Button
-              onClick={handleNext}
-              className="w-32 bg-gradient-to-r from-cyan-500 via-orange-500 to-pink-500 hover:opacity-90 text-white"
+              onClick={handleBack}
+              variant="outline"
+              disabled={currentStep === 1}
+              className="w-32"
             >
-              Next
-              <ArrowRight className="ml-2 h-4 w-4" />
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
             </Button>
-          )}
-        </div>
+
+            {currentStep < totalSteps && (
+              <Button
+                onClick={handleNext}
+                className="w-32 bg-gradient-to-r from-cyan-500 via-orange-500 to-pink-500 hover:opacity-90 text-white"
+              >
+                Next
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
