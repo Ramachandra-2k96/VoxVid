@@ -104,6 +104,9 @@ VoxVid/
    # Google Cloud Storage (Required for file uploads)
    GCP_SERVICE_ACCOUNT_FILE=/path/to/Backend/your-service-account-file.json
    GCP_BUCKET_NAME=your-unique-bucket-name
+
+   Brevo_API_Key=xkeysib-20a05ffb4731aHFWjy94Tln82THsX(Update it)
+   Brevo_API_Email=ramachandraudupa2004@gmail.com(Add )
    ```
 
 6. **Run database migrations**
