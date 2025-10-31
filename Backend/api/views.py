@@ -22,6 +22,54 @@ from api.gcp_storage import (
     download_and_upload_to_gcp,
     generate_unique_blob_name
 )
+from pydub import AudioSegment
+from django.core.files.base import ContentFile
+
+
+def convert_audio_to_mp3(audio_file):
+    """
+    Convert any audio file to MP3 format using pydub.
+    Returns a ContentFile object containing the MP3 data.
+    """
+    try:
+        # Create a temporary file to save the uploaded audio
+        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(audio_file.name)[1]) as temp_input:
+            # Write uploaded file to temp location
+            for chunk in audio_file.chunks():
+                temp_input.write(chunk)
+            temp_input_path = temp_input.name
+        
+        # Load audio using pydub (supports many formats)
+        audio = AudioSegment.from_file(temp_input_path)
+        
+        # Create a temporary file for MP3 output
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as temp_output:
+            temp_output_path = temp_output.name
+        
+        # Export as MP3
+        audio.export(temp_output_path, format='mp3', bitrate='192k')
+        
+        # Read the MP3 file into memory
+        with open(temp_output_path, 'rb') as mp3_file:
+            mp3_data = mp3_file.read()
+        
+        # Clean up temporary files
+        try:
+            os.unlink(temp_input_path)
+            os.unlink(temp_output_path)
+        except Exception as e:
+            logging.warning(f'Failed to clean up temp files: {e}')
+        
+        # Create a ContentFile with MP3 data
+        original_name = os.path.splitext(audio_file.name)[0]
+        mp3_content = ContentFile(mp3_data, name=f'{original_name}.mp3')
+        
+        return mp3_content
+        
+    except Exception as e:
+        logging.exception(f'Error converting audio to MP3: {e}')
+        raise
+
 
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
@@ -164,19 +212,25 @@ def create_video_generation(request):
     }
 
     if input_type == 'voice':
-        # Upload audio file to GCP
+        # Upload audio file to GCP (convert to MP3 first)
         gcp_audio_url = None
         if audio_file and isinstance(audio_file, InMemoryUploadedFile):
             try:
-                # Generate unique blob name for the audio
-                blob_name = generate_unique_blob_name('audio', audio_file.name)
+                # Convert audio to MP3 format
+                logging.info(f'Converting audio file {audio_file.name} to MP3...')
+                mp3_file = convert_audio_to_mp3(audio_file)
                 
-                # Upload to GCP and get public URL
-                gcp_audio_url = upload_file_object_to_gcp(audio_file, blob_name)
+                # Generate unique blob name for the MP3 audio
+                original_name = os.path.splitext(audio_file.name)[0]
+                blob_name = generate_unique_blob_name('audio', f'{original_name}.mp3')
+                
+                # Upload MP3 to GCP and get public URL
+                gcp_audio_url = upload_file_object_to_gcp(mp3_file, blob_name)
+                logging.info(f'Successfully uploaded MP3 audio to GCP: {gcp_audio_url}')
                 
             except Exception as e:
-                logging.exception('Error uploading audio to GCP: %s', e)
-                return Response({"detail": "Failed to upload audio to GCP"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                logging.exception('Error converting/uploading audio to GCP: %s', e)
+                return Response({"detail": f"Failed to process audio file: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         if not gcp_audio_url:
             return Response({"detail": "Failed to get audio URL"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

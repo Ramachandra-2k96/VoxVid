@@ -5,7 +5,8 @@ django-cors-headers>=4.0
 django-environ>=0.11
 python-dotenv>=1.1
 gunicorn>=20.1
-psycopg2-binary>=2.9  # optional if using Postgres; can be removed for sqlite
+psycopg2-binary>=2.9  
 requests>=2.25
 google-cloud-storage
 agno>=0.4.0
+pydub>=0.25.1
