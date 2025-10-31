@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
-from .models import VideoGeneration, Profile
+from .models import VideoGeneration, Profile, PasswordResetOTP, VideoLike, VideoView
 
 User = get_user_model()
 
@@ -50,8 +50,45 @@ class ProfileSerializer(serializers.ModelSerializer):
 
 
 class VideoGenerationSerializer(serializers.ModelSerializer):
+    likes_count = serializers.SerializerMethodField()
+    is_liked = serializers.SerializerMethodField()
+    user_info = serializers.SerializerMethodField()
+
     class Meta:
         model = VideoGeneration
         fields = '__all__'
-        read_only_fields = ('user', 'talk_id', 'created_at', 'modified_at')
+        read_only_fields = ('user', 'talk_id', 'created_at', 'modified_at', 'views_count')
+
+    def get_likes_count(self, obj):
+        return obj.likes.count()
+
+    def get_is_liked(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.likes.filter(user=request.user).exists()
+        return False
+
+    def get_user_info(self, obj):
+        return {
+            'id': obj.user.id,
+            'username': obj.user.username,
+            'email': obj.user.email
+        }
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class PasswordResetVerifySerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    otp = serializers.CharField(max_length=6, min_length=6)
+    new_password = serializers.CharField(min_length=8, write_only=True)
+
+
+class VideoLikeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VideoLike
+        fields = '__all__'
+        read_only_fields = ('user', 'created_at')
 

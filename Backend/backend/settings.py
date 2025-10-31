@@ -180,6 +180,9 @@ CEREBRUS_API_KEY = env("CEREBRUS_API_KEY")
 GCP_SERVICE_ACCOUNT_FILE = env("GCP_SERVICE_ACCOUNT_FILE")
 GCP_BUCKET_NAME = env("GCP_BUCKET_NAME")
 
+BREVO_API_KEY = env("Brevo_API_Key",default='')
+BREVO_API_EMAIL = env("Brevo_API_Email",default='')
+
 # Initialize GCP Storage on startup
 if GCP_SERVICE_ACCOUNT_FILE:
     try:

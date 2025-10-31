@@ -461,3 +461,219 @@ def ai_enhance_script(request):
     run_response = agent.run(message, user_id=str(request.user.id))
     print(run_response.content)
     return Response({"enhanced_script": run_response.content})
+
+
+# ============================================
+# Password Reset Views
+# ============================================
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def request_password_reset(request):
+    """Request OTP for password reset"""
+    from .serializers import PasswordResetRequestSerializer
+    from .models import PasswordResetOTP
+    from .email_service import generate_otp, send_otp_email
+    from django.contrib.auth import get_user_model
+    
+    serializer = PasswordResetRequestSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    email = serializer.validated_data['email']
+    
+    # Check if user exists
+    User = get_user_model()
+    try:
+        user = User.objects.get(email=email)
+    except User.DoesNotExist:
+        # Don't reveal if email exists or not for security
+        return Response({"detail": "If the email exists, you will receive an OTP."}, status=status.HTTP_200_OK)
+    
+    # Generate OTP
+    otp = generate_otp()
+    
+    # Save OTP to database
+    PasswordResetOTP.objects.create(email=email, otp=otp)
+    
+    # Send email
+    email_sent = send_otp_email(email, otp)
+    
+    if email_sent:
+        return Response({"detail": "OTP sent to your email."}, status=status.HTTP_200_OK)
+    else:
+        return Response({"detail": "Failed to send email. Please try again."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def verify_otp_and_reset_password(request):
+    """Verify OTP and reset password"""
+    from .serializers import PasswordResetVerifySerializer
+    from .models import PasswordResetOTP
+    from django.contrib.auth import get_user_model
+    
+    serializer = PasswordResetVerifySerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    email = serializer.validated_data['email']
+    otp = serializer.validated_data['otp']
+    new_password = serializer.validated_data['new_password']
+    
+    # Find valid OTP
+    try:
+        otp_record = PasswordResetOTP.objects.filter(
+            email=email,
+            otp=otp,
+            is_used=False
+        ).order_by('-created_at').first()
+        
+        if not otp_record:
+            return Response({"detail": "Invalid OTP."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not otp_record.is_valid():
+            return Response({"detail": "OTP has expired."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Mark OTP as used
+        otp_record.is_used = True
+        otp_record.save()
+        
+        # Reset password
+        User = get_user_model()
+        try:
+            user = User.objects.get(email=email)
+            user.set_password(new_password)
+            user.save()
+            
+            return Response({"detail": "Password reset successfully."}, status=status.HTTP_200_OK)
+        except User.DoesNotExist:
+            return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+            
+    except Exception as e:
+        logging.exception(f"Error resetting password: {e}")
+        return Response({"detail": "An error occurred."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ============================================
+# Social Feed Views
+# ============================================
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_public_videos(request):
+    """Get paginated list of public videos for social feed"""
+    from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+    
+    page = request.GET.get('page', 1)
+    page_size = request.GET.get('page_size', 10)
+    
+    try:
+        page_size = int(page_size)
+        if page_size > 50:  # Limit max page size
+            page_size = 50
+    except ValueError:
+        page_size = 10
+    
+    # Get public videos with completed status
+    videos = VideoGeneration.objects.filter(
+        is_public=True,
+        status='done'
+    ).select_related('user').prefetch_related('likes')
+    
+    paginator = Paginator(videos, page_size)
+    
+    try:
+        videos_page = paginator.page(page)
+    except PageNotAnInteger:
+        videos_page = paginator.page(1)
+    except EmptyPage:
+        videos_page = paginator.page(paginator.num_pages)
+    
+    serializer = VideoGenerationSerializer(
+        videos_page.object_list,
+        many=True,
+        context={'request': request}
+    )
+    
+    return Response({
+        'results': serializer.data,
+        'count': paginator.count,
+        'total_pages': paginator.num_pages,
+        'current_page': videos_page.number,
+        'has_next': videos_page.has_next(),
+        'has_previous': videos_page.has_previous()
+    })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def toggle_video_publish(request, pk):
+    """Toggle video public/private status"""
+    try:
+        video = VideoGeneration.objects.get(pk=pk, user=request.user)
+    except VideoGeneration.DoesNotExist:
+        return Response({"detail": "Video not found."}, status=status.HTTP_404_NOT_FOUND)
+    
+    video.is_public = not video.is_public
+    video.save()
+    
+    serializer = VideoGenerationSerializer(video, context={'request': request})
+    return Response(serializer.data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def like_video(request, pk):
+    """Like or unlike a video"""
+    from .models import VideoLike
+    
+    try:
+        video = VideoGeneration.objects.get(pk=pk, is_public=True)
+    except VideoGeneration.DoesNotExist:
+        return Response({"detail": "Video not found."}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Check if already liked
+    like, created = VideoLike.objects.get_or_create(user=request.user, video=video)
+    
+    if not created:
+        # Unlike
+        like.delete()
+        return Response({"detail": "Video unliked.", "is_liked": False})
+    else:
+        # Liked
+        return Response({"detail": "Video liked.", "is_liked": True})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def record_video_view(request, pk):
+    """Record a view on a video - only counts unique views per user"""
+    from .models import VideoView
+    
+    try:
+        video = VideoGeneration.objects.get(pk=pk, is_public=True)
+    except VideoGeneration.DoesNotExist:
+        return Response({"detail": "Video not found."}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Get client IP
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip_address = x_forwarded_for.split(',')[0]
+    else:
+        ip_address = request.META.get('REMOTE_ADDR')
+    
+    # Use get_or_create to ensure only one view per user per video
+    view, created = VideoView.objects.get_or_create(
+        user=request.user,
+        video=video,
+        defaults={'ip_address': ip_address}
+    )
+    
+    if created:
+        # Update view count only if it's a new view
+        video.views_count = video.views.count()
+        video.save()
+        return Response({"detail": "View recorded.", "views_count": video.views_count, "is_new_view": True})
+    else:
+        return Response({"detail": "View already recorded.", "views_count": video.views_count, "is_new_view": False})

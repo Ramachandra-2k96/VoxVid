@@ -5,7 +5,8 @@ import { useParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Download, Share2, Play, Image as ImageIcon, Loader2 } from 'lucide-react'
+import { ArrowLeft, Download, Share2, Play, Image as ImageIcon, Loader2, Globe, Lock } from 'lucide-react'
+import { toast } from '@/hooks/use-toast'
 
 interface Project {
   id: string
@@ -18,6 +19,7 @@ interface Project {
   status?: string
   resultUrl?: string
   createdAt: string
+  isPublic?: boolean
 }
 
 export default function ProjectDetailPage() {
@@ -25,6 +27,7 @@ export default function ProjectDetailPage() {
   const router = useRouter()
   const [project, setProject] = useState<Project | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isTogglingPublic, setIsTogglingPublic] = useState(false)
 
   useEffect(() => {
     const loadProject = async () => {
@@ -50,6 +53,7 @@ export default function ProjectDetailPage() {
             status: data.status,
             resultUrl: data.result_url,
             createdAt: data.created_at,
+            isPublic: data.is_public || false,
           }
           setProject(mapped)
         }
@@ -113,6 +117,48 @@ export default function ProjectDetailPage() {
     }
   }
 
+  const handleTogglePublic = async () => {
+    if (!project) return
+    
+    setIsTogglingPublic(true)
+    try {
+      const API_URL = (process.env.NEXT_PUBLIC_API_URL as string)
+      const tokens = JSON.parse(localStorage.getItem('voxvid_tokens') || '{}')
+      const response = await fetch(`${API_URL}/api/videos/${params.id}/publish/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${tokens.access}`,
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setProject({ ...project, isPublic: data.is_public })
+        toast({
+          title: data.is_public ? "Video Published!" : "Video Made Private",
+          description: data.is_public 
+            ? "Your video is now visible in the social feed" 
+            : "Your video has been removed from the social feed",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to update video visibility",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error('Error toggling public status:', error)
+      toast({
+        title: "Error",
+        description: "Failed to connect to server",
+        variant: "destructive",
+      })
+    } finally {
+      setIsTogglingPublic(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black text-white">
       <div className="max-w-6xl mx-auto p-8">
@@ -127,6 +173,24 @@ export default function ProjectDetailPage() {
             Back to Projects
           </Button>
           <div className="flex gap-2">
+            {project.step === 4 && (
+              <Button 
+                onClick={handleTogglePublic} 
+                variant={project.isPublic ? "default" : "outline"}
+                size="sm"
+                disabled={isTogglingPublic}
+                className={project.isPublic ? "bg-green-600 hover:bg-green-700" : ""}
+              >
+                {isTogglingPublic ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : project.isPublic ? (
+                  <Globe className="mr-2 h-4 w-4" />
+                ) : (
+                  <Lock className="mr-2 h-4 w-4" />
+                )}
+                {project.isPublic ? 'Public' : 'Make Public'}
+              </Button>
+            )}
             <Button onClick={handleShare} variant="outline" size="sm">
               <Share2 className="mr-2 h-4 w-4" />
               Share
@@ -143,9 +207,17 @@ export default function ProjectDetailPage() {
           <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent">
             {project.name}
           </h1>
-          <Badge variant="secondary" className="text-sm">
-            {project.step === 4 ? 'Completed' : 'In Progress'}
-          </Badge>
+          <div className="flex items-center justify-center gap-2">
+            <Badge variant="secondary" className="text-sm">
+              {project.step === 4 ? 'Completed' : 'In Progress'}
+            </Badge>
+            {project.isPublic && (
+              <Badge variant="default" className="text-sm bg-green-600">
+                <Globe className="mr-1 h-3 w-3" />
+                Public
+              </Badge>
+            )}
+          </div>
         </div>
 
         {/* Main Content */}
