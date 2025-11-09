@@ -50,33 +50,6 @@ VoxVid/
     └── .env                     # Environment variables
 ```
 
-## 🛠️ Technology Stack
-
-### Backend
-- **Django 5.2+** - Web framework
-- **Django REST Framework** - API development
-- **JWT Authentication** - Secure user authentication with SimpleJWT
-- **SQLite/PostgreSQL** - Database (SQLite for development, PostgreSQL for production)
-- **Google Cloud Storage** - Cloud file storage for images, videos, and audio
-- **D-ID API** - AI video generation with talking avatars
-- **HeyGen API** - Advanced AI video generation with custom positioning
-- **Cerebras API** - AI-powered script enhancement
-- **Brevo (Sendinblue)** - Email service for OTP and notifications
-- **Pydub** - Audio processing and conversion
-- **CORS Headers** - Cross-origin resource sharing
-
-### Frontend
-- **Next.js 15** - React framework with App Router
-- **TypeScript** - Type safety
-- **Tailwind CSS** - Utility-first styling
-- **Radix UI** - Accessible component primitives
-- **Motion (Framer Motion)** - Advanced animations
-- **React Hook Form** - Form state management
-- **Zod** - Schema validation
-- **Lucide React** - Icon library
-- **Next Themes** - Dark/light mode support
-- **Web Speech API** - Browser-based voice input
-
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -327,7 +300,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 |---------|------|--------|
 | **Avatar Upload** | ✅ Yes | ✅ Yes |
 | **Text-to-Speech** | ✅ Yes | ✅ Yes |
-| **Audio Input** | ❌ No | ✅ Yes |
+| **Audio Input** | ✅ Yes | ✅ Yes |
 | **Custom Backgrounds** | ❌ No | ✅ Yes (Image/Video) |
 | **Avatar Positioning** | ❌ Limited | ✅ Full Control (X, Y, Scale) |
 | **Avatar Shapes** | ❌ No | ✅ Square/Circle |
@@ -437,62 +410,6 @@ VoxVid uses Google Cloud Storage for storing uploaded images and generated video
 - **Voice Input Button** - Speech-to-text for hands-free script writing
 - **Theme Toggle** - Switch between light and dark modes
 - **Video Preview Canvas** - Real-time avatar positioning preview
-
-## �️ Devoelopment Tips
-
-### Backend Development
-- Use Django admin panel (`/admin`) to manage users and videos
-- Check logs for detailed error messages during video generation
-- Test API endpoints using tools like Postman or curl
-- Monitor GCP bucket usage in Google Cloud Console
-- Use Django shell for database queries: `python manage.py shell`
-
-### Frontend Development
-- Use browser DevTools to debug API calls
-- Test voice input in Chrome/Edge (best Web Speech API support)
-- Use React DevTools to inspect component state
-- Test both light and dark themes
-- Check console for any client-side errors
-
-### Testing Video Generation
-- Start with D-ID for simpler testing
-- Use small images (< 5MB) for faster uploads
-- Test HeyGen with both text and audio inputs
-- Verify GCP URLs are publicly accessible
-- Monitor video status updates in real-time
-
-### Performance Optimization
-- Implement image compression before upload
-- Use lazy loading for video thumbnails
-- Cache frequently accessed data
-- Optimize database queries with select_related/prefetch_related
-- Use CDN for static assets in production
-
-## � Sepcurity Considerations
-
-### API Keys
-- Never commit `.env` files to version control
-- Rotate API keys regularly
-- Use different keys for development and production
-- Monitor API usage and set up billing alerts
-
-### Authentication
-- JWT tokens expire after configured time
-- Refresh tokens for extended sessions
-- OTP codes expire after 10 minutes
-- Passwords are hashed using Django's default PBKDF2
-
-### File Uploads
-- Validate file types and sizes on backend
-- Scan uploaded files for malware in production
-- Use signed URLs for temporary access
-- Implement rate limiting for uploads
-
-### CORS & CSRF
-- Configure CORS_ALLOWED_ORIGINS for specific domains
-- Enable CSRF protection for state-changing operations
-- Use HTTPS in production
-- Set secure cookie flags
 
 ## 🚀 Deployment
 
