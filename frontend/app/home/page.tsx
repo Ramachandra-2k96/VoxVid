@@ -215,15 +215,27 @@ export default function HomePage() {
                 Create and manage your AI-generated videos
               </p>
             </div>
-            <Button 
-              onClick={() => router.push('/home/create')}
-              size="lg"
-              className="bg-gradient-to-r from-cyan-500 via-orange-500 to-pink-500 hover:opacity-90 text-white border-0 shadow-lg hover:shadow-xl transition-all"
-            >
-              <Plus className="mr-2 h-5 w-5" />
-              <span className="hidden sm:inline">New Project</span>
-              <span className="sm:hidden">New</span>
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => router.push('/home/create')}
+                size="lg"
+                className="bg-gradient-to-r from-cyan-500 via-orange-500 to-pink-500 hover:opacity-90 text-white border-0 shadow-lg hover:shadow-xl transition-all"
+              >
+                <Plus className="mr-2 h-5 w-5" />
+                <span className="hidden sm:inline">New Project</span>
+                <span className="sm:hidden">New</span>
+              </Button>
+              <Button 
+                onClick={() => router.push('/home/create_heygen')}
+                size="lg"
+                variant="outline"
+                className="border-2 hover:border-primary"
+              >
+                <Sparkles className="mr-2 h-5 w-5" />
+                <span className="hidden sm:inline">HeyGen Style</span>
+                <span className="sm:hidden">HeyGen</span>
+              </Button>
+            </div>
           </div>
         </div>
 

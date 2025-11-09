@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from '@/components/ui/badge'
+import { VoiceInputButton } from '@/components/voice-input-button'
 import { 
   ArrowLeft, 
   ArrowRight, 
@@ -458,7 +459,7 @@ export default function CreateProjectPage() {
                   placeholder="e.g., Product Launch, Tutorial Video, Welcome Message"
                   value={formData.name}
                   onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  className="mt-2 h-12 text-base bg-background border-border focus:border-primary"
+                  className="mt-2 h-12 text-base text-foreground bg-background border-border focus:border-primary placeholder:text-muted-foreground"
                   autoFocus
                 />
               </div>
@@ -510,14 +511,25 @@ export default function CreateProjectPage() {
               {/* Text Input */}
               {formData.inputType === 'text' && (
                 <div className="relative">
-                  <Label htmlFor="script" className="text-base font-medium">Script</Label>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label htmlFor="script" className="text-base font-medium">Script</Label>
+                    <VoiceInputButton
+                      onTranscript={(text) => {
+                        setFormData(prev => ({
+                          ...prev,
+                          script: prev.script ? prev.script + ' ' + text : text
+                        }))
+                      }}
+                      size="sm"
+                    />
+                  </div>
                   <Textarea
                     id="script"
                     placeholder="Enter your script here... This text will be converted to speech by AI."
                     value={formData.script}
                     onChange={(e) => setFormData(prev => ({ ...prev, script: e.target.value }))}
                     rows={10}
-                    className="mt-2 text-base bg-background border-border focus:border-primary resize-none"
+                    className="mt-2 text-base text-foreground bg-background border-border focus:border-primary resize-none placeholder:text-muted-foreground"
                   />
                   <div className="absolute bottom-4 right-4">
                     <Button
@@ -652,7 +664,7 @@ export default function CreateProjectPage() {
                             <div className="flex items-center gap-3">
                               <Volume2 className="h-8 w-8 text-primary" />
                               <div>
-                                <p className="font-medium">{formData.audioFile?.name || 'Recorded Audio'}</p>
+                                <p className="font-medium text-foreground">{formData.audioFile?.name || 'Recorded Audio'}</p>
                                 <p className="text-sm text-muted-foreground">
                                   {formData.audioFile ? `${(formData.audioFile.size / 1024 / 1024).toFixed(2)} MB` : 'Audio ready'}
                                 </p>
@@ -894,7 +906,7 @@ export default function CreateProjectPage() {
                         <CardContent className="p-5">
                           <div className="flex items-start justify-between mb-3">
                             <div className="flex-1">
-                              <h4 className="font-semibold text-base flex items-center gap-2">
+                              <h4 className="font-semibold text-base text-foreground flex items-center gap-2">
                                 {voice.name}
                                 {isSelected && (
                                   <Badge variant="default" className="text-xs">Selected</Badge>
@@ -1072,7 +1084,7 @@ export default function CreateProjectPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24 theme-transition">
+    <div className="min-h-screen bg-background text-foreground pb-24 theme-transition">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -1095,7 +1107,7 @@ export default function CreateProjectPage() {
                     ? 'w-8 bg-gradient-to-r from-cyan-500 via-orange-500 to-pink-500'
                     : index + 1 < currentStep
                     ? 'w-6 bg-primary'
-                    : 'w-6 bg-muted'
+                    : 'w-6 bg-border'
                 }`}
               />
             ))}
