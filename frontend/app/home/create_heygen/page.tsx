@@ -265,18 +265,18 @@ export default function CreateHeyGenPage() {
       width *= scale
       height *= scale
 
-      // Convert normalized coordinates (-1 to 1) to pixel coordinates
-      // X: -1 = left edge, 0 = center, 1 = right edge
-      // Y: -1 = top edge, 0 = center, 1 = bottom edge
+      // Convert normalized coordinates (-0.5 to 0.5) to pixel coordinates
+      // X: -0.5 = left, 0 = center, 0.5 = right
+      // Y: -0.5 = top, 0 = center, 0.5 = bottom
       const normalizedX = formData.avatarX
       const normalizedY = formData.avatarY
       
       const centerX = canvas.width / 2
       const centerY = canvas.height / 2
       
-      // Calculate position with normalized coordinates
-      const x = centerX + (normalizedX * (canvas.width / 2)) - (width / 2)
-      const y = centerY + (normalizedY * (canvas.height / 2)) - (height / 2)
+      // Calculate position with normalized coordinates (multiply by full width/height since range is -0.5 to 0.5)
+      const x = centerX + (normalizedX * canvas.width) - (width / 2)
+      const y = centerY + (normalizedY * canvas.height) - (width / 2)
 
       // Apply clipping for circle shape
       if (formData.avatarShape === 'circle') {
@@ -692,8 +692,8 @@ export default function CreateHeyGenPage() {
                         <Label className="text-xs">X Offset: {formData.avatarX.toFixed(2)}</Label>
                         <input
                           type="range"
-                          min="-1"
-                          max="1"
+                          min="-0.5"
+                          max="0.5"
                           step="0.01"
                           value={formData.avatarX}
                           onChange={(e) => setFormData(prev => ({ ...prev, avatarX: parseFloat(e.target.value) }))}
@@ -704,14 +704,14 @@ export default function CreateHeyGenPage() {
                               [&::-webkit-slider-runnable-track]:bg-gray-300
                               dark:[&::-webkit-slider-runnable-track]:bg-gray-600"
                         />
-                        <p className="text-[10px] text-muted-foreground">-1 (left) to 1 (right)</p>
+                        <p className="text-[10px] text-muted-foreground">-0.5 (left) to 0.5 (right)</p>
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs">Y Offset: {formData.avatarY.toFixed(2)}</Label>
                         <input
                           type="range"
-                          min="-1"
-                          max="1"
+                          min="-0.5"
+                          max="0.5"
                           step="0.01"
                           value={formData.avatarY}
                           onChange={(e) => setFormData(prev => ({ ...prev, avatarY: parseFloat(e.target.value) }))}
@@ -722,7 +722,7 @@ export default function CreateHeyGenPage() {
                             [&::-webkit-slider-runnable-track]:bg-gray-300
                             dark:[&::-webkit-slider-runnable-track]:bg-gray-600" 
                         />
-                        <p className="text-[10px] text-muted-foreground">-1 (top) to 1 (bottom)</p>
+                        <p className="text-[10px] text-muted-foreground">-0.5 (top) to 0.5 (bottom)</p>
                       </div>
                     </div>
                     

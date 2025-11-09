@@ -226,7 +226,7 @@ export default function SocialPage() {
               loop
               playsInline
               muted={isMuted}
-              className="absolute inset-0 w-full h-full object-cover bg-black"
+              className="absolute inset-0 w-full h-full object-contain bg-black"
               onClick={() => {
                 const videoEl = videoRefs.current.get(index);
                 if (videoEl) {

@@ -291,41 +291,71 @@ def create_video_generation(request):
                 provider_data['language'] = voice_language
             talk_payload['script']['provider'] = provider_data
 
-    print(talk_payload)
+    print("=== D-ID API Request ===")
+    print(f"Payload: {talk_payload}")
 
-    response = requests.post(
-        'https://api.d-id.com/talks',
-        headers={
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Authorization': f'Basic {did_api_key}',
-        },
-        json=talk_payload
-    )
+    try:
+        response = requests.post(
+            'https://api.d-id.com/talks',
+            headers={
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Authorization': f'Basic {did_api_key}',
+            },
+            json=talk_payload
+        )
 
-    if not response.ok:
-        return Response({"detail": "Failed to start video generation"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        print(f"D-ID Response Status: {response.status_code}")
+        print(f"D-ID Response Body: {response.text}")
 
-    data = response.json()
-    talk_id = data.get('id')
-    if not talk_id:
-        return Response({"detail": "No talk ID from D-ID"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        if not response.ok:
+            logging.error(f"D-ID API error: {response.status_code} - {response.text}")
+            return Response({
+                "detail": "Failed to start video generation",
+                "error": response.text,
+                "status_code": response.status_code
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    # Save to DB with GCP image URL
-    video_gen = VideoGeneration.objects.create(
-        user=request.user,
-        name=name,
-        source_url=gcp_image_url or source_url,  # Store GCP URL
-        script_input=script_input if script_input else "",
-        talk_id=talk_id,
-        status='created',
-        voice_provider=voice_provider or 'Custom',
-        voice_id=voice_id or 'Custom_voice_id',
-        config={'fluent': False, 'pad_audio': 0.0},
-    )
+        data = response.json()
+        talk_id = data.get('id')
+        if not talk_id:
+            logging.error(f"No talk ID in D-ID response: {data}")
+            return Response({"detail": "No talk ID from D-ID", "response": data}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    serializer = VideoGenerationSerializer(video_gen)
-    return Response(serializer.data, status=status.HTTP_201_CREATED)
+        print(f"D-ID Talk ID: {talk_id}")
+
+        # Save to DB with GCP image URL
+        print("=== Creating VideoGeneration record ===")
+        video_gen = VideoGeneration.objects.create(
+            user=request.user,
+            name=name,
+            platform='d-id',  # Set platform to d-id
+            source_url=gcp_image_url or source_url,  # Store GCP URL
+            script_input=script_input if script_input else "",
+            talk_id=talk_id,
+            status='created',
+            input_type=input_type,  # Store input type
+            voice_provider=voice_provider or 'Custom',
+            voice_id=voice_id or 'Custom_voice_id',
+            config={'fluent': False, 'pad_audio': 0.0},
+        )
+        print(f"VideoGeneration created: ID={video_gen.id}")
+
+        serializer = VideoGenerationSerializer(video_gen)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Request exception calling D-ID API: {str(e)}", exc_info=True)
+        return Response({
+            "detail": "Network error calling D-ID API",
+            "error": str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    except Exception as e:
+        logging.error(f"Unexpected error in create_video_generation: {str(e)}", exc_info=True)
+        return Response({
+            "detail": "Internal server error",
+            "error": str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET'])
@@ -356,49 +386,99 @@ def update_video_status(request, pk):
     except VideoGeneration.DoesNotExist:
         return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
 
-    # Fetch status from D-ID
-    did_api_key = getattr(settings, 'DDI_API_KEY', None)
-    if not did_api_key:
-        logging.error('DDI_API_KEY not set in settings')
-        return Response({"detail": "D-ID API key not configured on server"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    # Handle based on platform
+    print(f"=== Checking video status for platform: {video.platform} ===")
+    
+    if video.platform == 'heygen':
+        # Fetch status from HeyGen
+        print(f"Fetching HeyGen video status for video_id: {video.talk_id}")
+        heygen_api_key = getattr(settings, 'HEYGEN_API_KEY', None)
+        if not heygen_api_key:
+            print("ERROR: HeyGen API key not configured")
+            return Response({"detail": "HeyGen API key not configured"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    response = requests.get(
-        f'https://api.d-id.com/talks/{video.talk_id}',
-        headers={
-            'Accept': 'application/json',
-            'Authorization': f'Basic {did_api_key}',
-        }
-    )
+        response = requests.get(
+            f'https://api.heygen.com/v1/video_status.get?video_id={video.talk_id}',
+            headers={'X-Api-Key': heygen_api_key}
+        )
 
-    if response.ok:
-        data = response.json()
-        video.status = data.get('status', video.status)
-        
-        # If video generation is done and result_url is available, upload to GCP
-        if 'result_url' in data and data['result_url']:
-            did_video_url = data['result_url']
-            
-            # Check if we already have a GCP URL (avoid re-uploading)
-            if not video.result_url or not video.result_url.startswith('https://storage.googleapis.com/'):
-                try:
-                    # Generate unique blob name for the video
-                    blob_name = generate_unique_blob_name('videos', f"{video.name}_{video.talk_id}.mp4")
+        print(f"HeyGen Status Response: {response.status_code}")
+        print(f"HeyGen Status Data: {response.text}")
+
+        if response.ok:
+            data = response.json()
+            if data.get('code') == 100:
+                video_data = data['data']
+                old_status = video.status
+                heygen_status = video_data.get('status', video.status)
+                # Normalize HeyGen status to match D-ID convention
+                if heygen_status == 'completed':
+                    video.status = 'done'
+                elif heygen_status == 'failed':
+                    video.status = 'error'
+                else:
+                    video.status = heygen_status  # processing, pending, etc.
+                print(f"Status updated: {old_status} -> {video.status} (HeyGen: {heygen_status})")
+                
+                # If completed, upload to GCP
+                if video_data.get('status') == 'completed' and video_data.get('video_url'):
+                    heygen_video_url = video_data['video_url']
+                    print(f"Video completed! URL: {heygen_video_url}")
                     
-                    # Download from D-ID and upload to GCP
-                    gcp_video_url = download_and_upload_to_gcp(did_video_url, blob_name)
-                    
-                    # Store GCP URL instead of D-ID URL
-                    video.result_url = gcp_video_url
-                except Exception as e:
-                    logging.exception('Error uploading video to GCP: %s', e)
-                    # Fallback to D-ID URL if GCP upload fails
-                    video.result_url = did_video_url
+                    if not video.result_url or not video.result_url.startswith('https://storage.googleapis.com/'):
+                        try:
+                            print("Downloading and uploading to GCP...")
+                            blob_name = generate_unique_blob_name('videos', f"{video.name}_{video.talk_id}.mp4")
+                            gcp_video_url = download_and_upload_to_gcp(heygen_video_url, blob_name)
+                            video.result_url = gcp_video_url
+                            print(f"Video uploaded to GCP: {gcp_video_url}")
+                        except Exception as e:
+                            logging.exception('Error uploading HeyGen video to GCP: %s', e)
+                            print(f"ERROR uploading to GCP, using HeyGen URL: {str(e)}")
+                            video.result_url = heygen_video_url
+                
+                if video_data.get('thumbnail_url'):
+                    if not video.metadata:
+                        video.metadata = {}
+                    video.metadata['thumbnail_url'] = video_data['thumbnail_url']
+                    video.metadata['gif_url'] = video_data.get('gif_url')
+                    video.metadata['duration'] = video_data.get('duration')
+                    print(f"Metadata updated with thumbnail and duration")
+                
+                video.save()
+                print("Video record saved successfully")
+    else:
+        # Fetch status from D-ID
+        did_api_key = getattr(settings, 'DDI_API_KEY', None)
+        if not did_api_key:
+            return Response({"detail": "D-ID API key not configured"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        response = requests.get(
+            f'https://api.d-id.com/talks/{video.talk_id}',
+            headers={'Accept': 'application/json', 'Authorization': f'Basic {did_api_key}'}
+        )
+
+        if response.ok:
+            data = response.json()
+            video.status = data.get('status', video.status)
             
-        if 'audio_url' in data:
-            video.audio_url = data['audio_url']
-        if 'metadata' in data:
-            video.metadata = data['metadata']
-        video.save()
+            if 'result_url' in data and data['result_url']:
+                did_video_url = data['result_url']
+                
+                if not video.result_url or not video.result_url.startswith('https://storage.googleapis.com/'):
+                    try:
+                        blob_name = generate_unique_blob_name('videos', f"{video.name}_{video.talk_id}.mp4")
+                        gcp_video_url = download_and_upload_to_gcp(did_video_url, blob_name)
+                        video.result_url = gcp_video_url
+                    except Exception as e:
+                        logging.exception('Error uploading D-ID video to GCP: %s', e)
+                        video.result_url = did_video_url
+                
+            if 'audio_url' in data:
+                video.audio_url = data['audio_url']
+            if 'metadata' in data:
+                video.metadata = data['metadata']
+            video.save()
 
     serializer = VideoGenerationSerializer(video)
     return Response(serializer.data)
@@ -683,61 +763,221 @@ def record_video_view(request, pk):
 @permission_classes([IsAuthenticated])
 def create_heygen_video(request):
     """
-    Create HeyGen-style video endpoint.
-    For now, just logs the data and returns success.
+    Create HeyGen-style video endpoint with complete API integration.
     """
     try:
-        # Log all received data
-        print("=== HeyGen Video Creation Request ===")
-        print(f"User: {request.user.username}")
-        print(f"Project Name: {request.data.get('project_name')}")
-        print(f"Input Type: {request.data.get('input_type')}")
-        print(f"Script: {request.data.get('script')}")
-        print(f"Avatar Shape: {request.data.get('avatar_shape')}")
-        print(f"Background Type: {request.data.get('background_type')}")
-        print(f"Need Subtitles: {request.data.get('need_subtitles')}")
-        print(f"Avatar Scale: {request.data.get('avatar_scale')}")
-        print(f"Avatar X: {request.data.get('avatar_x')}")
-        print(f"Avatar Y: {request.data.get('avatar_y')}")
-        print(f"Selected Voice ID: {request.data.get('voice_id')}")
-        print(f"Selected Voice Name: {request.data.get('voice_name')}")
+        print("=== HeyGen Video Creation Started ===")
         
-        # Log files
-        if 'avatar_file' in request.FILES:
-            avatar_file = request.FILES['avatar_file']
-            print(f"Avatar File: {avatar_file.name} ({avatar_file.size} bytes)")
+        # Extract form data
+        project_name = request.data.get('project_name')
+        input_type = request.data.get('input_type')
+        script = request.data.get('script', '')
+        avatar_shape = request.data.get('avatar_shape', 'square')
+        background_type = request.data.get('background_type', 'image')
+        need_subtitles = request.data.get('need_subtitles', 'false').lower() == 'true'
+        avatar_scale = float(request.data.get('avatar_scale', 1.0))
+        avatar_x = float(request.data.get('avatar_x', 0.0))
+        avatar_y = float(request.data.get('avatar_y', 0.0))
+        voice_id = request.data.get('voice_id', '')
+        voice_name = request.data.get('voice_name', '')
         
-        if 'background_file' in request.FILES:
-            bg_file = request.FILES['background_file']
-            print(f"Background File: {bg_file.name} ({bg_file.size} bytes)")
+        avatar_file = request.FILES.get('avatar_file')
+        background_file = request.FILES.get('background_file')
+        audio_file = request.FILES.get('audio_file')
         
-        if 'audio_file' in request.FILES:
-            audio_file = request.FILES['audio_file']
-            print(f"Audio File: {audio_file.name} ({audio_file.size} bytes)")
+        print(f"Project: {project_name}, Input Type: {input_type}")
+        print(f"Files - Avatar: {avatar_file.name if avatar_file else None}, BG: {background_file.name if background_file else None}")
         
-        print("=== End of Request ===")
+        # Validation
+        if not project_name or not avatar_file or not background_file:
+            print("ERROR: Missing required fields")
+            return Response({"detail": "Missing required fields"}, status=status.HTTP_400_BAD_REQUEST)
         
-        # Return success response
-        return Response({
-            "status": "success",
-            "message": "HeyGen video creation request received",
-            "data": {
-                "project_name": request.data.get('project_name'),
-                "input_type": request.data.get('input_type'),
-                "avatar_shape": request.data.get('avatar_shape'),
-                "background_type": request.data.get('background_type'),
-                "need_subtitles": request.data.get('need_subtitles'),
-                "avatar_position": {
-                    "x": request.data.get('avatar_x'),
-                    "y": request.data.get('avatar_y'),
-                    "scale": request.data.get('avatar_scale')
-                }
+        try:
+            heygen_api_key = settings.HEYGEN_API_KEY
+            print(f"HeyGen API Key loaded: {heygen_api_key[:20] if heygen_api_key else 'None'}...")
+        except AttributeError:
+            print("ERROR: HeyGen_API_KEY not found in settings")
+            print(f"Available settings with 'key': {[attr for attr in dir(settings) if 'key' in attr.lower()]}")
+            return Response({"detail": "HeyGen API key not configured in settings"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        if not heygen_api_key:
+            print("ERROR: HeyGen API key is empty")
+            return Response({"detail": "HeyGen API key is empty"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        print("Step 1: Ensuring GCP bucket exists...")
+        ensure_bucket_exists()
+        
+        # Upload avatar to GCP
+        print("Step 2: Uploading avatar to GCP...")
+        avatar_blob_name = generate_unique_blob_name(f"heygen/avatars/{request.user.id}", avatar_file.name)
+        avatar_gcp_url = upload_file_object_to_gcp(avatar_file, avatar_blob_name)
+        print(f"Avatar uploaded to GCP: {avatar_gcp_url}")
+        
+        # Upload to HeyGen talking photo API
+        print("Step 3: Uploading avatar to HeyGen...")
+        avatar_file.seek(0)
+        talking_photo_response = requests.post(
+            'https://upload.heygen.com/v1/talking_photo',
+            headers={'x-api-key': heygen_api_key, 'Content-Type': avatar_file.content_type},
+            data=avatar_file.read()
+        )
+        
+        print(f"HeyGen Talking Photo Response Status: {talking_photo_response.status_code}")
+        print(f"HeyGen Talking Photo Response: {talking_photo_response.text}")
+        
+        if not talking_photo_response.ok:
+            print(f"ERROR: HeyGen talking photo upload failed")
+            return Response({
+                "detail": "Failed to upload avatar to HeyGen",
+                "error": talking_photo_response.text,
+                "status_code": talking_photo_response.status_code
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        talking_photo_data = talking_photo_response.json()
+        if talking_photo_data.get('code') != 100:
+            print(f"ERROR: HeyGen returned error code: {talking_photo_data}")
+            return Response({
+                "detail": "HeyGen talking photo upload failed",
+                "response": talking_photo_data
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        talking_photo_id = talking_photo_data['data']['talking_photo_id']
+        talking_photo_url = talking_photo_data['data']['talking_photo_url']
+        print(f"Talking Photo ID: {talking_photo_id}")
+        
+        # Upload background to GCP
+        print("Step 4: Uploading background to GCP...")
+        bg_blob_name = generate_unique_blob_name(f"heygen/backgrounds/{request.user.id}", background_file.name)
+        bg_gcp_url = upload_file_object_to_gcp(background_file, bg_blob_name)
+        print(f"Background uploaded to GCP: {bg_gcp_url}")
+        
+        # Handle audio if needed
+        audio_gcp_url = None
+        if input_type == 'audio' and audio_file:
+            print("Step 5: Processing audio file...")
+            converted_audio = convert_audio_to_mp3(audio_file)
+            audio_blob_name = generate_unique_blob_name(f"heygen/audio/{request.user.id}", "audio.mp3")
+            audio_gcp_url = upload_file_object_to_gcp(converted_audio, audio_blob_name)
+            print(f"Audio uploaded to GCP: {audio_gcp_url}")
+        
+        # Prepare HeyGen request
+        video_input = {
+            "character": {
+                "type": "talking_photo",
+                "talking_photo_id": talking_photo_id,
+                "scale": avatar_scale,
+                "talking_photo_style": avatar_shape,  # "circle" or "square"
+                "offset": {"x": avatar_x, "y": avatar_y},
+                "talking_style": "stable",
+                "expression": "default",
+                "engine_id": "avatar_iv"
+            },
+            "background": {
+                "type": background_type,
+                "url": bg_gcp_url,
+                "play_style": "loop" if background_type == "video" else "static"
             }
-        }, status=status.HTTP_200_OK)
+        }
         
-    except Exception as e:
-        logging.error(f"Error in create_heygen_video: {str(e)}")
+        if input_type == 'text':
+            video_input["voice"] = {
+                "type": "text",
+                "input_text": script,
+                "voice_id": voice_id,
+                "speed": 1.0,
+                "pitch": 0
+            }
+        else:
+            video_input["voice"] = {
+                "type": "audio",
+                "audio_url": audio_gcp_url  # HeyGen uses "audio_url" not "input_audio_url"
+            }
+        
+        heygen_payload = {
+            "title": project_name,
+            "caption": need_subtitles,
+            "dimension": {"width": 1280, "height": 720},
+            "video_inputs": [video_input]
+        }
+        
+        print(f"HeyGen Payload: {heygen_payload}")
+        
+        # Call HeyGen video generation API
+        print("Step 7: Calling HeyGen video generation API...")
+        heygen_response = requests.post(
+            'https://api.heygen.com/v2/video/generate',
+            headers={'X-Api-Key': heygen_api_key, 'Content-Type': 'application/json'},
+            json=heygen_payload
+        )
+        
+        print(f"HeyGen Video Gen Response Status: {heygen_response.status_code}")
+        print(f"HeyGen Video Gen Response: {heygen_response.text}")
+        
+        if not heygen_response.ok:
+            print(f"ERROR: HeyGen video generation failed")
+            return Response({
+                "detail": "Failed to generate video with HeyGen",
+                "error": heygen_response.text,
+                "status_code": heygen_response.status_code
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        heygen_video_data = heygen_response.json()
+        if heygen_video_data.get('error'):
+            print(f"ERROR: HeyGen returned error: {heygen_video_data}")
+            return Response({
+                "detail": "HeyGen video generation error",
+                "response": heygen_video_data
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        video_id = heygen_video_data['data']['video_id']
+        print(f"HeyGen Video ID: {video_id}")
+        
+        # Save to database
+        print("Step 8: Saving to database...")
+        video_gen = VideoGeneration.objects.create(
+            user=request.user,
+            name=project_name,
+            platform='heygen',
+            source_url=avatar_gcp_url,
+            script_input=script if input_type == 'text' else '',
+            talk_id=video_id,
+            status='processing',
+            talking_photo_id=talking_photo_id,
+            talking_photo_url=talking_photo_url,
+            background_url=bg_gcp_url,
+            background_type=background_type,
+            avatar_shape=avatar_shape,
+            avatar_scale=avatar_scale,
+            avatar_x=avatar_x,
+            avatar_y=avatar_y,
+            need_subtitles=need_subtitles,
+            input_type=input_type,
+            audio_url=audio_gcp_url,
+            voice_id=voice_id if input_type == 'text' else None,
+            voice_name=voice_name if input_type == 'text' else None,
+            config={'heygen_payload': heygen_payload}
+        )
+        print(f"VideoGeneration created: ID={video_gen.id}")
+        
+        serializer = VideoGenerationSerializer(video_gen)
+        print("=== HeyGen Video Creation Completed Successfully ===")
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        
+    except requests.exceptions.RequestException as e:
+        print(f"ERROR: Request exception: {str(e)}")
+        logging.error(f"Request exception in create_heygen_video: {str(e)}", exc_info=True)
         return Response({
             "status": "error",
-            "message": str(e)
+            "message": f"Network error: {str(e)}"
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    except Exception as e:
+        print(f"ERROR: Unexpected exception: {str(e)}")
+        logging.error(f"Error in create_heygen_video: {str(e)}", exc_info=True)
+        import traceback
+        traceback.print_exc()
+        return Response({
+            "status": "error",
+            "message": str(e),
+            "type": type(e).__name__
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

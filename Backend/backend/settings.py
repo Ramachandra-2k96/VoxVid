@@ -174,7 +174,7 @@ CORS_ALLOW_CREDENTIALS = True
 
 # External API keys (D-ID)
 DDI_API_KEY = env("DDI_API_KEY")
-HeyGen_API_KEY = env("HeyGen_API_KEY")
+HEYGEN_API_KEY = env("HEYGEN_API_KEY")
 CEREBRUS_API_KEY = env("CEREBRUS_API_KEY")
 
 # Google Cloud Storage Configuration

@@ -44,20 +44,43 @@ class PasswordResetOTP(models.Model):
 class VideoGeneration(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='video_generations')
     name = models.CharField(max_length=255)
+    
+    # Platform identifier: 'd-id' or 'heygen'
+    platform = models.CharField(max_length=20, default='d-id')
+    
+    # Common fields
     source_url = models.URLField()  # GCP public URL of uploaded image
-    script_input = models.TextField()
-    talk_id = models.CharField(max_length=255, unique=True)
+    script_input = models.TextField(blank=True, null=True)
+    talk_id = models.CharField(max_length=255, unique=True)  # D-ID talk_id or HeyGen video_id
     status = models.CharField(max_length=50, default='created')
     result_url = models.URLField(blank=True, null=True)  # GCP public URL of final video
     audio_url = models.URLField(blank=True, null=True)
-    # Fields returned by D-ID image upload
+    
+    # D-ID specific fields
     image_id = models.CharField(max_length=255, blank=True, null=True)
     image_s3_url = models.URLField(blank=True, null=True)
+    
+    # HeyGen specific fields
+    talking_photo_id = models.CharField(max_length=255, blank=True, null=True)
+    talking_photo_url = models.URLField(blank=True, null=True)
+    background_url = models.URLField(blank=True, null=True)  # GCP URL of background
+    background_type = models.CharField(max_length=20, blank=True, null=True)  # 'image' or 'video'
+    avatar_shape = models.CharField(max_length=20, blank=True, null=True)  # 'square' or 'circle'
+    avatar_scale = models.FloatField(blank=True, null=True)
+    avatar_x = models.FloatField(blank=True, null=True)
+    avatar_y = models.FloatField(blank=True, null=True)
+    need_subtitles = models.BooleanField(default=False)
+    input_type = models.CharField(max_length=20, blank=True, null=True)  # 'text' or 'audio'
+    
     # Voice configuration fields
     voice_provider = models.CharField(max_length=50, blank=True, null=True)
     voice_id = models.CharField(max_length=255, blank=True, null=True)
+    voice_name = models.CharField(max_length=255, blank=True, null=True)
+    
+    # Metadata and config
     metadata = models.JSONField(blank=True, null=True)
     config = models.JSONField(default=dict)
+    
     # Social features
     is_public = models.BooleanField(default=False)
     views_count = models.IntegerField(default=0)
@@ -65,7 +88,7 @@ class VideoGeneration(models.Model):
     modified_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.name} - {self.talk_id}"
+        return f"{self.name} - {self.talk_id} ({self.platform})"
 
     class Meta:
         ordering = ['-created_at']

@@ -80,7 +80,8 @@ export default function HomePage() {
           const mapped = data.map((v: any) => ({
           id: v.id.toString(),
           name: v.name,
-          step: v.status === 'done' ? 4 : v.status === 'created' ? 3 : 1,
+          step: v.status === 'done' || v.status === 'completed' ? 4 : 
+                v.status === 'processing' || v.status === 'created' ? 3 : 1,
           prompt: v.script_input,
             imageUrl: v.source_url,
             imageBase64: v.original_image_base64 || null,
@@ -158,8 +159,10 @@ export default function HomePage() {
       })
       if (response.ok) {
         const data = await response.json()
-        if (data.status === 'done') {
+        if (data.status === 'done' || data.status === 'completed') {
           setProjects(prev => prev.map(p => p.id === projectId ? { ...p, step: 4, status: 'done', resultUrl: data.result_url } : p))
+        } else if (data.status === 'processing') {
+          setProjects(prev => prev.map(p => p.id === projectId ? { ...p, step: 3, status: 'processing' } : p))
         }
       }
     } catch (error) {
