@@ -677,3 +677,67 @@ def record_video_view(request, pk):
         return Response({"detail": "View recorded.", "views_count": video.views_count, "is_new_view": True})
     else:
         return Response({"detail": "View already recorded.", "views_count": video.views_count, "is_new_view": False})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_heygen_video(request):
+    """
+    Create HeyGen-style video endpoint.
+    For now, just logs the data and returns success.
+    """
+    try:
+        # Log all received data
+        print("=== HeyGen Video Creation Request ===")
+        print(f"User: {request.user.username}")
+        print(f"Project Name: {request.data.get('project_name')}")
+        print(f"Input Type: {request.data.get('input_type')}")
+        print(f"Script: {request.data.get('script')}")
+        print(f"Avatar Shape: {request.data.get('avatar_shape')}")
+        print(f"Background Type: {request.data.get('background_type')}")
+        print(f"Need Subtitles: {request.data.get('need_subtitles')}")
+        print(f"Avatar Scale: {request.data.get('avatar_scale')}")
+        print(f"Avatar X: {request.data.get('avatar_x')}")
+        print(f"Avatar Y: {request.data.get('avatar_y')}")
+        print(f"Selected Voice ID: {request.data.get('voice_id')}")
+        print(f"Selected Voice Name: {request.data.get('voice_name')}")
+        
+        # Log files
+        if 'avatar_file' in request.FILES:
+            avatar_file = request.FILES['avatar_file']
+            print(f"Avatar File: {avatar_file.name} ({avatar_file.size} bytes)")
+        
+        if 'background_file' in request.FILES:
+            bg_file = request.FILES['background_file']
+            print(f"Background File: {bg_file.name} ({bg_file.size} bytes)")
+        
+        if 'audio_file' in request.FILES:
+            audio_file = request.FILES['audio_file']
+            print(f"Audio File: {audio_file.name} ({audio_file.size} bytes)")
+        
+        print("=== End of Request ===")
+        
+        # Return success response
+        return Response({
+            "status": "success",
+            "message": "HeyGen video creation request received",
+            "data": {
+                "project_name": request.data.get('project_name'),
+                "input_type": request.data.get('input_type'),
+                "avatar_shape": request.data.get('avatar_shape'),
+                "background_type": request.data.get('background_type'),
+                "need_subtitles": request.data.get('need_subtitles'),
+                "avatar_position": {
+                    "x": request.data.get('avatar_x'),
+                    "y": request.data.get('avatar_y'),
+                    "scale": request.data.get('avatar_scale')
+                }
+            }
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logging.error(f"Error in create_heygen_video: {str(e)}")
+        return Response({
+            "status": "error",
+            "message": str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -176,15 +176,15 @@ export default function HomePage() {
   const getStatusBadge = (project: Project) => {
     switch (project.step) {
       case 0: return <Badge variant="secondary" className="bg-muted/50 hover:bg-muted/70 border-border">Draft</Badge>
-      case 1: return <Badge variant="secondary" className="bg-blue-500/10 text-blue-400 border-blue-500/20">Pending</Badge>
+      case 1: return <Badge variant="secondary" className="bg-blue-500/10 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20">Pending</Badge>
       case 3: return (
-        <Badge variant="secondary" className="bg-amber-500/10 text-amber-400 border-amber-500/20">
+        <Badge variant="secondary" className="bg-amber-500/10 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20">
           <Loader2 className="mr-1 h-3 w-3 animate-spin" />
           Processing
         </Badge>
       )
       case 4: return (
-        <Badge variant="secondary" className="bg-green-500/10 text-green-400 border-green-500/20">
+        <Badge variant="secondary" className="bg-green-500/10 dark:bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20">
           <CheckCircle2 className="mr-1 h-3 w-3" />
           Complete
         </Badge>
@@ -229,7 +229,7 @@ export default function HomePage() {
                 onClick={() => router.push('/home/create_heygen')}
                 size="lg"
                 variant="outline"
-                className="border-2 hover:border-primary"
+                className="border-2 hover:border-primary text-black dark:text-white"
               >
                 <Sparkles className="mr-2 h-5 w-5" />
                 <span className="hidden sm:inline">HeyGen Style</span>
@@ -248,8 +248,8 @@ export default function HomePage() {
                   <p className="text-sm text-muted-foreground">Total Projects</p>
                   <p className="text-2xl font-bold text-foreground mt-1">{projects.length}</p>
                 </div>
-                <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center">
-                  <Video className="h-6 w-6 text-blue-500" />
+                <div className="w-12 h-12 rounded-full bg-blue-500/10 dark:bg-blue-500/10 flex items-center justify-center">
+                  <Video className="h-6 w-6 text-blue-600 dark:text-blue-500" />
                 </div>
               </div>
             </CardContent>
@@ -264,8 +264,8 @@ export default function HomePage() {
                     {projects.filter(p => p.step === 4).length}
                   </p>
                 </div>
-                <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center">
-                  <CheckCircle2 className="h-6 w-6 text-green-500" />
+                <div className="w-12 h-12 rounded-full bg-green-500/10 dark:bg-green-500/10 flex items-center justify-center">
+                  <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-500" />
                 </div>
               </div>
             </CardContent>
@@ -280,8 +280,8 @@ export default function HomePage() {
                     {projects.filter(p => p.step === 3).length}
                   </p>
                 </div>
-                <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center">
-                  <Loader2 className="h-6 w-6 text-amber-500 animate-spin" />
+                <div className="w-12 h-12 rounded-full bg-amber-500/10 dark:bg-amber-500/10 flex items-center justify-center">
+                  <Loader2 className="h-6 w-6 text-amber-600 dark:text-amber-500 animate-spin" />
                 </div>
               </div>
             </CardContent>

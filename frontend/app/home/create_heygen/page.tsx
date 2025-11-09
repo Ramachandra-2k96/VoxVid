@@ -400,6 +400,92 @@ export default function CreateHeyGenPage() {
     }
   }
 
+  const handleSubmit = async () => {
+    // Validation
+    if (!formData.projectName.trim()) {
+      alert('Please enter a project name')
+      return
+    }
+
+    if (formData.inputType === 'text' && !formData.script.trim()) {
+      alert('Please enter a script')
+      return
+    }
+
+    if (formData.inputType === 'audio' && !formData.audioFile) {
+      alert('Please upload or record audio')
+      return
+    }
+
+    if (!formData.avatarFile) {
+      alert('Please upload an avatar image')
+      return
+    }
+
+    if (!formData.backgroundFile) {
+      alert('Please upload a background')
+      return
+    }
+
+    if (formData.inputType === 'text' && !formData.selectedVoice) {
+      alert('Please select a voice')
+      return
+    }
+
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
+      const tokens = JSON.parse(localStorage.getItem('voxvid_tokens') || '{}')
+
+      const formDataToSend = new FormData()
+      formDataToSend.append('project_name', formData.projectName)
+      formDataToSend.append('input_type', formData.inputType)
+      formDataToSend.append('avatar_shape', formData.avatarShape)
+      formDataToSend.append('background_type', formData.backgroundType)
+      formDataToSend.append('need_subtitles', formData.needSubtitles.toString())
+      formDataToSend.append('avatar_scale', formData.avatarScale.toString())
+      formDataToSend.append('avatar_x', formData.avatarX.toString())
+      formDataToSend.append('avatar_y', formData.avatarY.toString())
+
+      if (formData.inputType === 'text') {
+        formDataToSend.append('script', formData.script)
+        if (formData.selectedVoice) {
+          formDataToSend.append('voice_id', formData.selectedVoice.voice_id)
+          formDataToSend.append('voice_name', formData.selectedVoice.name)
+        }
+      } else if (formData.audioFile) {
+        formDataToSend.append('audio_file', formData.audioFile)
+      }
+
+      if (formData.avatarFile) {
+        formDataToSend.append('avatar_file', formData.avatarFile)
+      }
+
+      if (formData.backgroundFile) {
+        formDataToSend.append('background_file', formData.backgroundFile)
+      }
+
+      const response = await fetch(`${API_URL}/api/heygen/create/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${tokens.access}`,
+        },
+        body: formDataToSend,
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to create video')
+      }
+
+      const data = await response.json()
+      console.log('Success:', data)
+      alert('Video creation request submitted successfully!')
+      router.push('/home')
+    } catch (error) {
+      console.error('Error:', error)
+      alert('Failed to create video. Please try again.')
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground theme-transition">
       <div className="h-screen flex flex-col">
@@ -418,6 +504,7 @@ export default function CreateHeyGenPage() {
               <h1 className="text-xl font-semibold">Create HeyGen Video</h1>
             </div>
             <Button
+              onClick={handleSubmit}
               className="bg-gradient-to-r from-cyan-500 via-orange-500 to-pink-500 hover:opacity-90 text-white"
             >
               Generate Video
@@ -587,7 +674,12 @@ export default function CreateHeyGenPage() {
                           step="0.1"
                           value={formData.avatarScale}
                           onChange={(e) => setFormData(prev => ({ ...prev, avatarScale: parseFloat(e.target.value) }))}
-                          className="flex-1"
+                          className="flex-1 accent-primary
+    dark:accent-primary
+    [&::-webkit-slider-thumb]:bg-primary
+    [&::-moz-range-thumb]:bg-primary
+    [&::-webkit-slider-runnable-track]:bg-gray-300
+    dark:[&::-webkit-slider-runnable-track]:bg-gray-600"
                         />
                         <Button size="sm" variant="outline" onClick={() => setFormData(prev => ({ ...prev, avatarScale: Math.min(3, prev.avatarScale + 0.1) }))}>
                           <ZoomIn className="h-3 w-3" />
@@ -605,7 +697,12 @@ export default function CreateHeyGenPage() {
                           step="0.01"
                           value={formData.avatarX}
                           onChange={(e) => setFormData(prev => ({ ...prev, avatarX: parseFloat(e.target.value) }))}
-                          className="w-full"
+                          className="w-full accent-primary
+                              dark:accent-primary
+                              [&::-webkit-slider-thumb]:bg-primary
+                              [&::-moz-range-thumb]:bg-primary
+                              [&::-webkit-slider-runnable-track]:bg-gray-300
+                              dark:[&::-webkit-slider-runnable-track]:bg-gray-600"
                         />
                         <p className="text-[10px] text-muted-foreground">-1 (left) to 1 (right)</p>
                       </div>
@@ -618,7 +715,12 @@ export default function CreateHeyGenPage() {
                           step="0.01"
                           value={formData.avatarY}
                           onChange={(e) => setFormData(prev => ({ ...prev, avatarY: parseFloat(e.target.value) }))}
-                          className="w-full"
+                          className="w-full accent-primary
+                            dark:accent-primary
+                            [&::-webkit-slider-thumb]:bg-primary
+                            [&::-moz-range-thumb]:bg-primary
+                            [&::-webkit-slider-runnable-track]:bg-gray-300
+                            dark:[&::-webkit-slider-runnable-track]:bg-gray-600" 
                         />
                         <p className="text-[10px] text-muted-foreground">-1 (top) to 1 (bottom)</p>
                       </div>

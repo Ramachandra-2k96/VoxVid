@@ -32,4 +32,7 @@ urlpatterns = [
     
     # AI Enhancement
     path('ai/enhance/', views.ai_enhance_script, name='ai_enhance_script'),
+    
+    # HeyGen Style Video
+    path('heygen/create/', views.create_heygen_video, name='create_heygen_video'),
 ]
