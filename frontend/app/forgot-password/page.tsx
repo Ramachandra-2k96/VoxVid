@@ -28,7 +28,7 @@ export default function ForgotPasswordPage() {
     setIsLoading(true)
 
     try {
-      const res = await fetch(`${API_URL}/auth/password-reset/request/`, {
+      const res = await fetch(`${API_URL}/api/auth/password-reset/request/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
@@ -66,7 +66,7 @@ export default function ForgotPasswordPage() {
     setIsLoading(true)
 
     try {
-      const res = await fetch(`${API_URL}/auth/password-reset/verify/`, {
+      const res = await fetch(`${API_URL}/api/auth/password-reset/verify/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -94,11 +94,11 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white font-geist flex">
+    <div className="min-h-screen bg-background text-foreground font-geist flex">
       {/* Home Button */}
       <Link
         href="/login"
-        className="fixed top-6 left-6 z-50 flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-2 transition-all duration-200"
+        className="fixed top-6 left-6 z-50 flex items-center gap-2 bg-primary/10 hover:bg-primary/20 backdrop-blur-sm border border-border rounded-lg px-4 py-2 transition-all duration-200"
         style={{
           fontFamily: "GeistMono, monospace",
         }}
@@ -108,25 +108,22 @@ export default function ForgotPasswordPage() {
       </Link>
 
       {/* Left Side - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-primary/20 via-primary/10 to-background">
         {/* Gradient Background */}
         <div className="absolute inset-0">
           <div
-            className="absolute inset-0"
+            className="absolute inset-0 opacity-30 dark:opacity-100"
             style={{
               background: "linear-gradient(135deg, #22D3EE 0%, #FF5C28 50%, #FF5C9D 100%)",
             }}
           />
           <div
-            className="absolute inset-0"
-            style={{
-              backgroundColor: "rgba(0, 0, 0, 0.7)",
-            }}
+            className="absolute inset-0 bg-background/80 dark:bg-black/70"
           />
         </div>
 
         {/* Noise Overlay */}
-        <div className="absolute inset-0 opacity-20">
+        <div className="absolute inset-0 opacity-10 dark:opacity-20">
           <div
             className="w-full h-full"
             style={{
@@ -153,7 +150,7 @@ export default function ForgotPasswordPage() {
               Reset Password
             </h1>
             <p
-              className="text-white/80 text-lg max-w-md"
+              className="text-foreground/80 text-lg max-w-md"
               style={{
                 fontFamily: "GeistMono, monospace",
               }}
@@ -163,19 +160,19 @@ export default function ForgotPasswordPage() {
           </div>
 
           <div className="space-y-4">
-            <div className="flex items-center gap-3 text-white/70">
+            <div className="flex items-center gap-3 text-muted-foreground">
               <KeyRound className="h-5 w-5 text-cyan-400" />
               <span className="text-sm" style={{ fontFamily: "GeistMono, monospace" }}>
                 Secure OTP Verification
               </span>
             </div>
-            <div className="flex items-center gap-3 text-white/70">
+            <div className="flex items-center gap-3 text-muted-foreground">
               <Mail className="h-5 w-5 text-orange-400" />
               <span className="text-sm" style={{ fontFamily: "GeistMono, monospace" }}>
                 Email Confirmation
               </span>
             </div>
-            <div className="flex items-center gap-3 text-white/70">
+            <div className="flex items-center gap-3 text-muted-foreground">
               <Lock className="h-5 w-5 text-pink-400" />
               <span className="text-sm" style={{ fontFamily: "GeistMono, monospace" }}>
                 Enhanced Security
@@ -216,8 +213,8 @@ export default function ForgotPasswordPage() {
 
           {/* Error Message */}
           {error && (
-            <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/50">
-              <p className="text-red-400 text-sm" style={{ fontFamily: "GeistMono, monospace" }}>
+            <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/50">
+              <p className="text-destructive text-sm" style={{ fontFamily: "GeistMono, monospace" }}>
                 {error}
               </p>
             </div>
@@ -247,7 +244,7 @@ export default function ForgotPasswordPage() {
                     Email Address
                   </Label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/40" />
+                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                     <Input
                       id="email"
                       type="email"
@@ -255,7 +252,7 @@ export default function ForgotPasswordPage() {
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="your.email@example.com"
                       required
-                      className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/40 focus:border-cyan-400 focus:ring-cyan-400"
+                      className="pl-10"
                       style={{ fontFamily: "GeistMono, monospace" }}
                     />
                   </div>
@@ -291,7 +288,7 @@ export default function ForgotPasswordPage() {
                   Verify Your Email
                 </h2>
                 <p
-                  className="text-white/60 text-sm"
+                  className="text-muted-foreground text-sm"
                   style={{ fontFamily: "GeistMono, monospace" }}
                 >
                   Enter the 6-digit code sent to <span className="text-cyan-400">{email}</span>
@@ -304,7 +301,7 @@ export default function ForgotPasswordPage() {
                     Verification Code
                   </Label>
                   <div className="relative">
-                    <KeyRound className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/40" />
+                    <KeyRound className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                     <Input
                       id="otp"
                       type="text"
@@ -313,11 +310,11 @@ export default function ForgotPasswordPage() {
                       placeholder="000000"
                       required
                       maxLength={6}
-                      className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/40 focus:border-cyan-400 focus:ring-cyan-400 text-center text-2xl tracking-widest"
+                      className="pl-10 text-center text-2xl tracking-widest"
                       style={{ fontFamily: "GeistMono, monospace" }}
                     />
                   </div>
-                  <p className="text-xs text-white/50 text-center" style={{ fontFamily: "GeistMono, monospace" }}>
+                  <p className="text-xs text-muted-foreground text-center" style={{ fontFamily: "GeistMono, monospace" }}>
                     Code expires in 10 minutes
                   </p>
                 </div>
@@ -335,7 +332,7 @@ export default function ForgotPasswordPage() {
                 <button
                   type="button"
                   onClick={() => setStep('email')}
-                  className="w-full text-sm text-white/60 hover:text-white/80"
+                  className="w-full text-sm text-muted-foreground hover:text-foreground"
                   style={{ fontFamily: "GeistMono, monospace" }}
                 >
                   Didn't receive the code? Resend
@@ -355,7 +352,7 @@ export default function ForgotPasswordPage() {
                   Set New Password
                 </h2>
                 <p
-                  className="text-white/60 text-sm"
+                  className="text-muted-foreground text-sm"
                   style={{ fontFamily: "GeistMono, monospace" }}
                 >
                   Create a strong password for your account
@@ -368,7 +365,7 @@ export default function ForgotPasswordPage() {
                     New Password
                   </Label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/40" />
+                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                     <Input
                       id="newPassword"
                       type="password"
@@ -377,7 +374,7 @@ export default function ForgotPasswordPage() {
                       placeholder="••••••••"
                       required
                       minLength={8}
-                      className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/40 focus:border-cyan-400 focus:ring-cyan-400"
+                      className="pl-10"
                       style={{ fontFamily: "GeistMono, monospace" }}
                     />
                   </div>
@@ -388,7 +385,7 @@ export default function ForgotPasswordPage() {
                     Confirm Password
                   </Label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/40" />
+                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                     <Input
                       id="confirmPassword"
                       type="password"
@@ -397,7 +394,7 @@ export default function ForgotPasswordPage() {
                       placeholder="••••••••"
                       required
                       minLength={8}
-                      className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/40 focus:border-cyan-400 focus:ring-cyan-400"
+                      className="pl-10"
                       style={{ fontFamily: "GeistMono, monospace" }}
                     />
                   </div>

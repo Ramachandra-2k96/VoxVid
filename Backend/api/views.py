@@ -564,6 +564,7 @@ def request_password_reset(request):
     
     # Check if user exists
     User = get_user_model()
+    print("Done")
     try:
         user = User.objects.get(email=email)
     except User.DoesNotExist:

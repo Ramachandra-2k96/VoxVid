@@ -37,18 +37,51 @@ def send_otp_email(receiver_email, otp):
         <!DOCTYPE html>
         <html>
         <head>
+            <meta name="color-scheme" content="light dark">
+            <meta name="supported-color-schemes" content="light dark">
             <style>
+                :root {{
+                    color-scheme: light dark;
+                    supported-color-schemes: light dark;
+                }}
                 body {{
                     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                    background-color: #000000;
-                    color: #ffffff;
+                    background-color: #f5f5f5;
+                    color: #1a1a1a;
                     padding: 20px;
+                    margin: 0;
+                }}
+                @media (prefers-color-scheme: dark) {{
+                    body {{
+                        background-color: #000000;
+                        color: #ffffff;
+                    }}
+                    .container {{
+                        background: linear-gradient(135deg, rgba(34, 211, 238, 0.1) 0%, rgba(255, 92, 40, 0.1) 50%, rgba(255, 92, 157, 0.1) 100%);
+                        border: 1px solid rgba(255, 255, 255, 0.1);
+                    }}
+                    .message {{
+                        color: rgba(255, 255, 255, 0.8);
+                    }}
+                    .otp-box {{
+                        background: rgba(255, 255, 255, 0.1);
+                        border: 2px solid #22D3EE;
+                    }}
+                    .otp-label {{
+                        color: rgba(255, 255, 255, 0.7);
+                    }}
+                    .otp-expiry {{
+                        color: rgba(255, 255, 255, 0.5);
+                    }}
+                    .footer {{
+                        color: rgba(255, 255, 255, 0.5);
+                    }}
                 }}
                 .container {{
                     max-width: 600px;
                     margin: 0 auto;
-                    background: linear-gradient(135deg, rgba(34, 211, 238, 0.1) 0%, rgba(255, 92, 40, 0.1) 50%, rgba(255, 92, 157, 0.1) 100%);
-                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    background: #ffffff;
+                    border: 1px solid #e0e0e0;
                     border-radius: 10px;
                     padding: 40px;
                 }}
@@ -63,7 +96,7 @@ def send_otp_email(receiver_email, otp):
                     margin-bottom: 30px;
                 }}
                 .otp-box {{
-                    background: rgba(255, 255, 255, 0.1);
+                    background: #f0f9ff;
                     border: 2px solid #22D3EE;
                     border-radius: 8px;
                     padding: 30px;
@@ -78,29 +111,42 @@ def send_otp_email(receiver_email, otp):
                     margin: 20px 0;
                 }}
                 .message {{
-                    color: rgba(255, 255, 255, 0.8);
+                    color: #4a4a4a;
                     line-height: 1.6;
                     margin: 20px 0;
                 }}
+                .otp-label {{
+                    margin: 0;
+                    color: #6b7280;
+                }}
+                .otp-expiry {{
+                    margin: 0;
+                    color: #9ca3af;
+                    font-size: 14px;
+                }}
                 .footer {{
                     text-align: center;
-                    color: rgba(255, 255, 255, 0.5);
+                    color: #9ca3af;
                     font-size: 12px;
                     margin-top: 30px;
+                }}
+                h2 {{
+                    text-align: center;
+                    color: inherit;
                 }}
             </style>
         </head>
         <body>
             <div class="container">
                 <div class="logo">VoxVid</div>
-                <h2 style="text-align: center; color: #ffffff;">Password Reset Request</h2>
+                <h2>Password Reset Request</h2>
                 <p class="message">
                     You have requested to reset your password. Use the verification code below to proceed:
                 </p>
                 <div class="otp-box">
-                    <p style="margin: 0; color: rgba(255, 255, 255, 0.7);">Your verification code is:</p>
+                    <p class="otp-label">Your verification code is:</p>
                     <div class="otp-code">{otp}</div>
-                    <p style="margin: 0; color: rgba(255, 255, 255, 0.5); font-size: 14px;">
+                    <p class="otp-expiry">
                         This code will expire in 10 minutes
                     </p>
                 </div>
